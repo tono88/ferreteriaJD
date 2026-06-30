@@ -1,0 +1,227 @@
+.o_ferreteria_transfer_request_popup {
+    width: 88vw;
+    max-width: 1100px;
+}
+
+.o_ferreteria_request_origin {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+    margin-bottom: 12px;
+
+    > div {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+        padding: 10px 12px;
+        border: 1px solid #ddd;
+        border-radius: 8px;
+        background: #fafafa;
+    }
+}
+
+.o_ferreteria_request_tabs {
+    margin-bottom: 14px;
+}
+
+.o_ferreteria_request_grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 14px;
+}
+
+.o_ferreteria_field {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+
+    label {
+        font-weight: 600;
+    }
+}
+
+.o_ferreteria_product_box {
+    padding: 12px;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    background: #fafafa;
+}
+
+.o_ferreteria_product_search {
+    display: flex;
+    align-items: flex-end;
+    gap: 10px;
+}
+
+.o_ferreteria_qty_field {
+    width: 120px;
+    flex: 0 0 120px;
+}
+
+.o_ferreteria_add_line {
+    padding-bottom: 1px;
+}
+
+.o_ferreteria_lines,
+.o_ferreteria_status_table {
+    max-height: 330px;
+    overflow: auto;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    background: white;
+}
+
+.o_ferreteria_line_qty {
+    min-width: 90px;
+}
+
+.o_ferreteria_request_footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+}
+
+.o_ferreteria_request_state {
+    display: inline-block;
+    padding: 3px 8px;
+    border-radius: 999px;
+    background: #e9ecef;
+    font-size: 0.85rem;
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.o_ferreteria_request_state_approved,
+.o_ferreteria_request_state_partial,
+.o_ferreteria_request_state_preparing {
+    background: #fff3cd;
+}
+
+.o_ferreteria_request_state_dispatched {
+    background: #cfe2ff;
+}
+
+.o_ferreteria_request_state_received,
+.o_ferreteria_request_state_closed {
+    background: #d1e7dd;
+}
+
+.o_ferreteria_request_state_rejected,
+.o_ferreteria_request_state_cancelled,
+.o_ferreteria_request_state_incident {
+    background: #f8d7da;
+}
+
+@media (max-width: 900px) {
+    .o_ferreteria_transfer_request_popup {
+        width: 100%;
+        max-width: 100%;
+    }
+
+    .o_ferreteria_request_origin,
+    .o_ferreteria_request_grid {
+        grid-template-columns: 1fr;
+    }
+
+    .o_ferreteria_product_search {
+        align-items: stretch;
+        flex-direction: column;
+    }
+
+    .o_ferreteria_qty_field {
+        width: auto;
+        flex: auto;
+    }
+}
+
+.o_ferreteria_product_lookup {
+    position: relative;
+    min-width: 0;
+}
+
+.o_ferreteria_product_suggestions {
+    position: absolute;
+    top: calc(100% + 4px);
+    left: 0;
+    right: 0;
+    z-index: 1060;
+    max-height: 300px;
+    overflow-y: auto;
+    border: 1px solid #d8dadd;
+    border-radius: 8px;
+    background: #fff;
+}
+
+.o_ferreteria_product_suggestion,
+.o_ferreteria_product_suggestion_status {
+    width: 100%;
+    padding: 10px 12px;
+    border: 0;
+    border-bottom: 1px solid #eceef0;
+    background: #fff;
+    text-align: left;
+}
+
+.o_ferreteria_product_suggestion {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    color: inherit;
+
+    &:hover,
+    &.active {
+        background: #f1eef8;
+    }
+
+    &:last-child {
+        border-bottom: 0;
+    }
+}
+
+.o_ferreteria_product_suggestion_main {
+    display: flex;
+    min-width: 0;
+    flex: 1 1 auto;
+    flex-direction: column;
+    gap: 2px;
+
+    strong,
+    small {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+}
+
+.o_ferreteria_product_suggestion_stock {
+    display: flex;
+    flex: 0 0 auto;
+    flex-direction: column;
+    align-items: flex-end;
+    white-space: nowrap;
+}
+
+.o_ferreteria_selected_product {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 8px 10px;
+    border: 1px solid #b8dfc7;
+    border-radius: 7px;
+    background: #eef9f2;
+}
+
+@media (max-width: 700px) {
+    .o_ferreteria_product_suggestion,
+    .o_ferreteria_selected_product {
+        align-items: flex-start;
+        flex-direction: column;
+        gap: 5px;
+    }
+
+    .o_ferreteria_product_suggestion_stock {
+        align-items: flex-start;
+    }
+}

@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <menuitem id="menu_vlf_dashboard_reports_root"
+              name="Reportes"
+              parent="vlf_dashboard_pro_ferre.menu_vlf_dashboard_root"
+              sequence="20"
+              groups="vlf_dashboard_pro_ferre.group_vlf_dashboard_user"/>
+
+    <menuitem id="menu_vlf_sales_order_fact"
+              name="Ventas consolidadas"
+              parent="menu_vlf_dashboard_reports_root"
+              action="action_vlf_sales_order_fact"
+              sequence="10"
+              groups="vlf_dashboard_pro_ferre.group_vlf_dashboard_user"/>
+
+    <menuitem id="menu_vlf_dashboard_update_presets"
+              name="Actualizar dashboards predeterminados"
+              parent="vlf_dashboard_pro_ferre.menu_vlf_dashboard_config_root"
+              action="action_vlf_dashboard_update_presets_wizard"
+              sequence="20"
+              groups="vlf_dashboard_pro_ferre.group_vlf_dashboard_manager"/>
+</odoo>

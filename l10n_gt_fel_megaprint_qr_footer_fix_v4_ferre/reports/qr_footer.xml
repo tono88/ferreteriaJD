@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<odoo>
+  <template id="qr_footer" inherit_id="l10n_gt_fel_megaprint_report_ferre.report_fel_invoice">
+    <xpath expr="//main[contains(@class,'fel')]" position="inside">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-top:10px;border-top:1px solid #ddd;padding-top:8px;">
+
+        <div style="display:flex;align-items:center;gap:16px;">
+          <img t-att-src="'/l10n_gt_fel_megaprint_qr_footer_fix_v4_ferre/static/src/img/fel_logo.png'" style="height:114px;"/>
+          <img t-att-src="'/report/barcode/QR/%s?width=120&amp;height=120&amp;humanreadable=0' % (o.fel_qr_encoded or '')" alt="FEL QR"/>
+        </div>
+</div>
+    </xpath>
+  </template>
+</odoo>

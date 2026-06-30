@@ -1,0 +1,126 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_vlf_sales_order_fact_list" model="ir.ui.view">
+        <field name="name">vlf.sales.order.fact.list</field>
+        <field name="model">vlf.sales.order.fact</field>
+        <field name="arch" type="xml">
+            <list string="Ventas operativas consolidadas" create="0" edit="0" delete="0">
+                <field name="date"/>
+                <field name="channel"/>
+                <field name="movement_type"/>
+                <field name="warehouse_id"/>
+                <field name="pos_config_id" optional="show"/>
+                <field name="document"/>
+                <field name="partner_id"/>
+                <field name="user_id"/>
+                <field name="amount_gross" string="Venta bruta con impuestos" sum="Total bruto"/>
+                <field name="amount_discount" sum="Total descuentos"/>
+                <field name="amount_refund" sum="Total devoluciones"/>
+                <field name="amount_tax" sum="Total impuestos" optional="show"/>
+                <field name="amount_net" sum="Total neto"/>
+                <field name="is_invoiced" optional="show"/>
+                <button name="action_open_source" type="object" string="Abrir" icon="fa-external-link"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_vlf_sales_order_fact_form" model="ir.ui.view">
+        <field name="name">vlf.sales.order.fact.form</field>
+        <field name="model">vlf.sales.order.fact</field>
+        <field name="arch" type="xml">
+            <form string="Movimiento de venta" create="0" edit="0" delete="0">
+                <header>
+                    <button name="action_open_source" type="object" string="Abrir documento origen" class="btn-primary"/>
+                </header>
+                <sheet>
+                    <group>
+                        <group>
+                            <field name="date"/>
+                            <field name="channel"/>
+                            <field name="movement_type"/>
+                            <field name="document"/>
+                            <field name="state"/>
+                            <field name="is_invoiced"/>
+                        </group>
+                        <group>
+                            <field name="warehouse_id"/>
+                            <field name="pos_config_id"/>
+                            <field name="partner_id"/>
+                            <field name="user_id"/>
+                            <field name="company_id" groups="base.group_system"/>
+                            <field name="currency_id" invisible="1"/>
+                        </group>
+                    </group>
+                    <group string="Importes">
+                        <field name="amount_gross"/>
+                        <field name="amount_untaxed"/>
+                        <field name="amount_tax"/>
+                        <field name="amount_discount"/>
+                        <field name="amount_refund"/>
+                        <field name="amount_net"/>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_vlf_sales_order_fact_search" model="ir.ui.view">
+        <field name="name">vlf.sales.order.fact.search</field>
+        <field name="model">vlf.sales.order.fact</field>
+        <field name="arch" type="xml">
+            <search string="Ventas operativas consolidadas">
+                <field name="document"/>
+                <field name="partner_id"/>
+                <field name="warehouse_id"/>
+                <field name="pos_config_id"/>
+                <field name="user_id"/>
+                <filter name="sales" string="Ventas" domain="[('movement_type','=','sale')]"/>
+                <filter name="refunds" string="Devoluciones" domain="[('movement_type','=','refund')]"/>
+                <filter name="pos" string="Punto de Venta" domain="[('channel','=','pos')]"/>
+                <filter name="sale" string="Ventas administrativas" domain="[('channel','=','sale')]"/>
+                <separator/>
+                <filter name="date" string="Fecha" date="date"/>
+                <group expand="0" string="Agrupar por">
+                    <filter name="group_channel" string="Canal" context="{'group_by':'channel'}"/>
+                    <filter name="group_warehouse" string="Sucursal" context="{'group_by':'warehouse_id'}"/>
+                    <filter name="group_pos" string="Punto de Venta" context="{'group_by':'pos_config_id'}"/>
+                    <filter name="group_partner" string="Cliente" context="{'group_by':'partner_id'}"/>
+                    <filter name="group_user" string="Vendedor/Cajero" context="{'group_by':'user_id'}"/>
+                    <filter name="group_month" string="Mes" context="{'group_by':'date:month'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="view_vlf_sales_order_fact_pivot" model="ir.ui.view">
+        <field name="name">vlf.sales.order.fact.pivot</field>
+        <field name="model">vlf.sales.order.fact</field>
+        <field name="arch" type="xml">
+            <pivot string="Ventas operativas consolidadas">
+                <field name="date" type="row" interval="month"/>
+                <field name="channel" type="col"/>
+                <field name="amount_net" type="measure"/>
+                <field name="amount_discount" type="measure"/>
+                <field name="amount_refund" type="measure"/>
+            </pivot>
+        </field>
+    </record>
+
+    <record id="view_vlf_sales_order_fact_graph" model="ir.ui.view">
+        <field name="name">vlf.sales.order.fact.graph</field>
+        <field name="model">vlf.sales.order.fact</field>
+        <field name="arch" type="xml">
+            <graph string="Ventas operativas consolidadas" type="bar">
+                <field name="date" interval="month"/>
+                <field name="amount_net" type="measure"/>
+            </graph>
+        </field>
+    </record>
+
+    <record id="action_vlf_sales_order_fact" model="ir.actions.act_window">
+        <field name="name">Ventas operativas consolidadas</field>
+        <field name="res_model">vlf.sales.order.fact</field>
+        <field name="view_mode">list,pivot,graph,form</field>
+        <field name="context">{'create': False}</field>
+    </record>
+</odoo>

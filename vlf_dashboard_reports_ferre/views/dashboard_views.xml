@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_vlf_dashboard_form_reports" model="ir.ui.view">
+        <field name="name">vlf.dashboard.form.reports</field>
+        <field name="model">vlf.dashboard</field>
+        <field name="inherit_id" ref="vlf_dashboard_pro_ferre.view_vlf_dashboard_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//field[@name='code']" position="after">
+                <field name="technical_key" readonly="managed_by_reports"/>
+                <field name="managed_by_reports" readonly="1"/>
+                <field name="preset_version" readonly="1" invisible="not managed_by_reports"/>
+            </xpath>
+            <xpath expr="//field[@name='company_ids']" position="attributes">
+                <attribute name="invisible">1</attribute>
+            </xpath>
+        </field>
+    </record>
+
+    <record id="view_vlf_dashboard_item_form_reports" model="ir.ui.view">
+        <field name="name">vlf.dashboard.item.form.reports</field>
+        <field name="model">vlf.dashboard.item</field>
+        <field name="inherit_id" ref="vlf_dashboard_pro_ferre.view_vlf_dashboard_item_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//field[@name='help_text']" position="after">
+                <field name="metric_key" readonly="managed_by_reports"/>
+                <field name="managed_by_reports" readonly="1"/>
+                <field name="preset_version" readonly="1" invisible="not managed_by_reports"/>
+            </xpath>
+        </field>
+    </record>
+</odoo>

@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<odoo>
+    <!-- Insertamos SOLO partner_ids, en una FILA nueva y ocupando ambas columnas -->
+    <record id="account_report_partner_ledger_view" model="ir.ui.view">
+        <field name="name">account.report.partner.ledger.view.form.inherit.base.accounting.kit</field>
+        <field name="model">account.report.partner.ledger</field>
+        <field name="inherit_id" ref="base_accounting_kit_ferre.account_report_view_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//field[@name='target_move']" position="after">
+                <!-- Fila nueva para no romper la grilla -->
+                <newline/>
+                <field name="partner_ids"
+                       colspan="2"
+                       widget="many2many_tags"
+                       options="{'no_create_edit': True}"/>
+                <!-- sin domain => lista TODOS los contactos de tu compañía (personas y empresas).
+                     Si en multicompañía quieres forzar a la compañía actual: 
+                     agrega domain="[('company_id','in',[False, company_id])]" -->
+            </xpath>
+        </field>
+    </record>
+
+    <record id="action_partner_leadger" model="ir.actions.act_window">
+        <field name="name">Partner Ledger</field>
+        <field name="res_model">account.report.partner.ledger</field>
+        <field name="type">ir.actions.act_window</field>
+        <field name="view_mode">form</field>
+        <field name="view_id" ref="account_report_partner_ledger_view"/>
+        <field name="target">new</field>
+    </record>
+
+    <menuitem name="Partner Ledger"
+              id="menu_partner_ledger" sequence="1"
+              parent="base_accounting_kit_ferre.account_reports_partner"
+              action="action_partner_leadger"/>
+</odoo>

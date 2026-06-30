@@ -1,0 +1,198 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_transfer_request_list" model="ir.ui.view">
+        <field name="name">ferreteria.transfer.request.list</field>
+        <field name="model">ferreteria.transfer.request</field>
+        <field name="arch" type="xml">
+            <list string="Solicitudes entre sucursales" default_order="request_date desc">
+                <field name="name"/>
+                <field name="request_date"/>
+                <field name="requesting_warehouse_id"/>
+                <field name="supplying_warehouse_id"/>
+                <field name="requester_id"/>
+                <field name="partner_id" optional="hide"/>
+                <field name="requested_qty_total" sum="Total"/>
+                <field name="approved_qty_total" sum="Total"/>
+                <field name="state" widget="badge"
+                       decoration-info="state in ('submitted', 'review')"
+                       decoration-warning="state in ('partial', 'preparing', 'dispatched', 'incident')"
+                       decoration-success="state in ('approved', 'received', 'closed')"
+                       decoration-danger="state in ('rejected', 'cancelled')"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_transfer_request_form" model="ir.ui.view">
+        <field name="name">ferreteria.transfer.request.form</field>
+        <field name="model">ferreteria.transfer.request</field>
+        <field name="arch" type="xml">
+            <form string="Solicitud entre sucursales">
+                <header>
+                    <button name="action_submit" type="object" string="Enviar solicitud"
+                            class="btn-primary" invisible="state != 'draft'"
+                            groups="ferreteria_pos_transfer_request_ferre.group_transfer_requester,ferreteria_pos_transfer_request_ferre.group_transfer_request_admin"/>
+                    <button name="action_start_review" type="object" string="Tomar en revisión"
+                            class="btn-secondary" invisible="state != 'submitted'"
+                            groups="ferreteria_pos_transfer_request_ferre.group_transfer_approver,ferreteria_pos_transfer_request_ferre.group_transfer_request_admin"/>
+                    <button name="action_approve_all" type="object" string="Aprobar todo"
+                            class="btn-primary" invisible="state not in ('submitted', 'review')"
+                            groups="ferreteria_pos_transfer_request_ferre.group_transfer_approver,ferreteria_pos_transfer_request_ferre.group_transfer_request_admin"/>
+                    <button name="action_approve_partial" type="object" string="Aprobar cantidades indicadas"
+                            class="btn-primary" invisible="state not in ('submitted', 'review')"
+                            groups="ferreteria_pos_transfer_request_ferre.group_transfer_approver,ferreteria_pos_transfer_request_ferre.group_transfer_request_admin"/>
+                    <button name="action_start_preparation" type="object" string="Iniciar preparación"
+                            invisible="state not in ('approved', 'partial')"
+                            groups="ferreteria_pos_transfer_request_ferre.group_transfer_dispatcher,ferreteria_pos_transfer_request_ferre.group_transfer_request_admin"/>
+                    <button name="action_dispatch" type="object" string="Confirmar despacho"
+                            class="btn-primary" invisible="state not in ('approved', 'partial', 'preparing')"
+                            groups="ferreteria_pos_transfer_request_ferre.group_transfer_dispatcher,ferreteria_pos_transfer_request_ferre.group_transfer_request_admin"/>
+                    <button name="action_receive" type="object" string="Confirmar recepción"
+                            class="btn-primary" invisible="state != 'dispatched'"
+                            groups="ferreteria_pos_transfer_request_ferre.group_transfer_receiver,ferreteria_pos_transfer_request_ferre.group_transfer_request_admin"/>
+                    <button name="action_register_incident" type="object" string="Registrar incidencia"
+                            invisible="state not in ('dispatched', 'received', 'incident')"
+                            groups="ferreteria_pos_transfer_request_ferre.group_transfer_approver,ferreteria_pos_transfer_request_ferre.group_transfer_dispatcher,ferreteria_pos_transfer_request_ferre.group_transfer_receiver,ferreteria_pos_transfer_request_ferre.group_transfer_request_admin"/>
+                    <button name="action_close" type="object" string="Cerrar solicitud"
+                            invisible="state not in ('received', 'incident')"
+                            groups="ferreteria_pos_transfer_request_ferre.group_transfer_receiver,ferreteria_pos_transfer_request_ferre.group_transfer_request_admin"/>
+                    <button name="action_reject" type="object" string="Rechazar"
+                            class="btn-danger" invisible="state not in ('submitted', 'review', 'approved', 'partial', 'preparing')"
+                            groups="ferreteria_pos_transfer_request_ferre.group_transfer_approver,ferreteria_pos_transfer_request_ferre.group_transfer_request_admin"/>
+                    <button name="action_cancel" type="object" string="Cancelar"
+                            invisible="state != 'draft'"
+                            groups="ferreteria_pos_transfer_request_ferre.group_transfer_requester,ferreteria_pos_transfer_request_ferre.group_transfer_request_admin"/>
+                    <field name="state" widget="statusbar"
+                           statusbar_visible="draft,submitted,review,approved,partial,preparing,rejected,dispatched,received,incident,closed,cancelled"/>
+                </header>
+                <sheet>
+                    <div class="oe_button_box" name="button_box">
+                        <button name="action_view_dispatch_picking" type="object" class="oe_stat_button"
+                                icon="fa-truck" string="Despacho" invisible="not dispatch_picking_id"/>
+                        <button name="action_view_receipt_picking" type="object" class="oe_stat_button"
+                                icon="fa-sign-in" string="Recepción" invisible="not receipt_picking_id"/>
+                        <button name="action_view_incidents" type="object" class="oe_stat_button"
+                                icon="fa-exclamation-triangle" invisible="incident_count == 0">
+                            <field name="incident_count" string="Incidencias" widget="statinfo"/>
+                        </button>
+                    </div>
+                    <div class="oe_title">
+                        <h1><field name="name" readonly="1"/></h1>
+                    </div>
+                    <group>
+                        <group string="Origen y destino">
+                            <field name="requesting_warehouse_id" readonly="state != 'draft'"
+                                   options="{'no_create': True}"/>
+                            <field name="supplying_warehouse_id" readonly="state != 'draft'"
+                                   domain="[('company_id', '=', company_id), ('id', '!=', requesting_warehouse_id)]"
+                                   options="{'no_create': True}"/>
+                            <field name="requesting_pos_id" readonly="state != 'draft'"
+                                   domain="[('company_id', '=', company_id)]"
+                                   options="{'no_create': True}"/>
+                            <field name="transit_location_id" readonly="1"/>
+                            <field name="company_id" readonly="1" groups="base.group_multi_company"/>
+                        </group>
+                        <group string="Solicitud">
+                            <field name="requester_id" readonly="1"/>
+                            <field name="request_date" readonly="state != 'draft'"/>
+                            <field name="partner_id" readonly="state != 'draft'" options="{'no_create': True}"/>
+                            <field name="submitted_at" readonly="1" invisible="not submitted_at"/>
+                        </group>
+                    </group>
+
+                    <notebook>
+                        <page string="Productos">
+                            <field name="line_ids">
+                                <list editable="bottom">
+                                    <field name="product_id" readonly="parent.state != 'draft'" options="{'no_create': True, 'no_quick_create': True, 'no_create_edit': True}"/>
+                                    <field name="product_uom_id" readonly="parent.state != 'draft'"/>
+                                    <field name="available_qty" readonly="1"/>
+                                    <field name="requested_qty" readonly="parent.state != 'draft'"/>
+                                    <field name="approved_qty" readonly="parent.state not in ('submitted', 'review')"/>
+                                    <field name="reserved_qty" readonly="1"/>
+                                    <field name="dispatched_qty" readonly="1"/>
+                                    <field name="received_qty" readonly="parent.state != 'dispatched'"/>
+                                    <field name="incident_qty" readonly="1"/>
+                                    <field name="note" readonly="parent.state != 'draft'" optional="hide"/>
+                                </list>
+                            </field>
+                            <group class="oe_subtotal_footer oe_right">
+                                <field name="requested_qty_total" readonly="1"/>
+                                <field name="approved_qty_total" readonly="1"/>
+                                <field name="dispatched_qty_total" readonly="1"/>
+                                <field name="received_qty_total" readonly="1"/>
+                            </group>
+                        </page>
+                        <page string="Observaciones">
+                            <group>
+                                <field name="request_note" readonly="state != 'draft'"/>
+                                <field name="approval_note" readonly="state not in ('submitted', 'review')"/>
+                                <field name="rejection_reason" readonly="state not in ('submitted', 'review', 'approved', 'partial', 'preparing')"/>
+                                <field name="dispatch_note" readonly="state not in ('approved', 'partial', 'preparing')"/>
+                                <field name="receipt_note" readonly="state != 'dispatched'"/>
+                            </group>
+                        </page>
+                        <page string="Trazabilidad">
+                            <group>
+                                <group>
+                                    <field name="reviewing_user_id" readonly="1"/>
+                                    <field name="review_date" readonly="1"/>
+                                    <field name="approved_by_id" readonly="1"/>
+                                    <field name="approval_date" readonly="1"/>
+                                    <field name="dispatched_by_id" readonly="1"/>
+                                    <field name="dispatch_date" readonly="1"/>
+                                </group>
+                                <group>
+                                    <field name="received_by_id" readonly="1"/>
+                                    <field name="receipt_date" readonly="1"/>
+                                    <field name="closed_by_id" readonly="1"/>
+                                    <field name="closed_date" readonly="1"/>
+                                    <field name="dispatch_picking_id" readonly="1"/>
+                                    <field name="receipt_picking_id" readonly="1"/>
+                                </group>
+                            </group>
+                        </page>
+                    </notebook>
+                </sheet>
+                <chatter/>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_transfer_request_search" model="ir.ui.view">
+        <field name="name">ferreteria.transfer.request.search</field>
+        <field name="model">ferreteria.transfer.request</field>
+        <field name="arch" type="xml">
+            <search string="Buscar solicitudes">
+                <field name="name"/>
+                <field name="requester_id"/>
+                <field name="requesting_warehouse_id"/>
+                <field name="supplying_warehouse_id"/>
+                <field name="partner_id"/>
+                <filter string="Pendientes de revisión" name="pending_review"
+                        domain="[('state', 'in', ('submitted', 'review'))]"/>
+                <filter string="Pendientes de despacho" name="pending_dispatch"
+                        domain="[('state', 'in', ('approved', 'partial', 'preparing'))]"/>
+                <filter string="En tránsito" name="in_transit" domain="[('state', '=', 'dispatched')]"/>
+                <filter string="Con incidencia" name="with_incident" domain="[('state', '=', 'incident')]"/>
+                <filter string="Fecha de solicitud" name="request_date" date="request_date"/>
+                <group expand="0" string="Agrupar por">
+                    <filter string="Estado" name="group_state" context="{'group_by': 'state'}"/>
+                    <filter string="Sucursal solicitante" name="group_requesting" context="{'group_by': 'requesting_warehouse_id'}"/>
+                    <filter string="Sucursal suministradora" name="group_supplying" context="{'group_by': 'supplying_warehouse_id'}"/>
+                    <filter string="Mes" name="group_month" context="{'group_by': 'request_date:month'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_transfer_request" model="ir.actions.act_window">
+        <field name="name">Solicitudes entre sucursales</field>
+        <field name="res_model">ferreteria.transfer.request</field>
+        <field name="view_mode">list,form</field>
+        <field name="search_view_id" ref="view_transfer_request_search"/>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">Cree una solicitud de productos entre sucursales.</p>
+            <p>La aprobación reserva existencias; el despacho y la recepción se confirman por separado.</p>
+        </field>
+    </record>
+</odoo>

@@ -1,0 +1,247 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+    <t t-name="vlf_dashboard_pro_ferre.DashboardClientAction">
+        <div t-attf-class="vlf-dashboard-app vlf-theme-#{state.dashboard.theme || 'light'} vlf-layout-#{state.dashboard.layout_mode || 'grid'}">
+            <div class="vlf-dashboard-toolbar">
+                <div class="vlf-toolbar-left">
+                    <h2 class="vlf-title">
+                        <i class="fa fa-dashboard"/> <t t-esc="state.dashboard.name || 'Dashboards'"/>
+                    </h2>
+                    <select class="vlf-select" t-on-change="onDashboardChange">
+                        <t t-foreach="state.catalog" t-as="dash" t-key="dash.id">
+                            <option t-att-value="dash.id" t-att-selected="dash.id === state.dashboard.id"><t t-esc="dash.name"/></option>
+                        </t>
+                    </select>
+                </div>
+                <div class="vlf-toolbar-actions">
+                    <button class="btn btn-secondary" t-on-click="reload"><i class="fa fa-refresh"/> Actualizar</button>
+                    <button class="btn btn-secondary" t-if="state.dashboard.allow_export" t-on-click="exportJSON"><i class="fa fa-download"/> JSON</button>
+                    <button class="btn btn-secondary" t-if="state.dashboard.allow_export" t-on-click="exportCSV"><i class="fa fa-file-text-o"/> CSV</button>
+                    <button class="btn btn-secondary" t-if="state.dashboard.allow_import" t-on-click="importJSONPrompt"><i class="fa fa-upload"/> Importar</button>
+                    <button class="btn btn-secondary" t-if="state.dashboard.allow_export" t-on-click="printDashboard"><i class="fa fa-print"/> PDF</button>
+                    <button class="btn btn-secondary" t-on-click="toggleHelp"><i class="fa fa-question-circle"/> Ayuda</button>
+                    <button class="btn btn-secondary" t-if="state.dashboard.allow_instant_edit" t-on-click="duplicateDashboard"><i class="fa fa-copy"/> Duplicar</button>
+                    <button class="btn btn-secondary" t-if="state.dashboard.allow_instant_edit" t-on-click="openDashboardConfig"><i class="fa fa-sliders"/> Configurar filtros</button>
+                    <button class="btn btn-primary" t-if="state.dashboard.allow_instant_edit" t-on-click="toggleBuilder"><i class="fa fa-magic"/> Constructor</button>
+                </div>
+            </div>
+
+            <div class="vlf-filter-panel" t-if="state.dashboard.enable_advanced_filters">
+                <div class="vlf-filter-group">
+                    <label>Desde</label>
+                    <input type="date" t-att-value="state.filters.date_from" t-on-change="onDateFromChange"/>
+                </div>
+                <div class="vlf-filter-group">
+                    <label>Hasta</label>
+                    <input type="date" t-att-value="state.filters.date_to" t-on-change="onDateToChange"/>
+                </div>
+                <div class="vlf-filter-group">
+                    <label>Compañía</label>
+                    <input type="number" t-att-value="state.filters.company_id" t-on-change="onCompanyChange" placeholder="ID compañía"/>
+                </div>
+                <t t-foreach="state.dashboard.custom_filters || []" t-as="cfilter" t-key="cfilter.key">
+                    <div class="vlf-filter-group vlf-custom-filter">
+                        <label><t t-esc="cfilter.name"/></label>
+                        <t t-if="cfilter.value_type === 'selection'">
+                            <select class="vlf-select" t-att-value="customFilterValue(cfilter.key)" t-on-change="(ev) => this.onCustomFilterChange(ev, cfilter.key, cfilter.value_type)">
+                                <option value="">Todos</option>
+                                <t t-foreach="cfilter.options || []" t-as="opt" t-key="opt.value">
+                                    <option t-att-value="opt.value"><t t-esc="opt.label"/></option>
+                                </t>
+                            </select>
+                        </t>
+                        <t t-elif="cfilter.value_type === 'date'">
+                            <input type="date" t-att-value="customFilterValue(cfilter.key)" t-on-change="(ev) => this.onCustomFilterChange(ev, cfilter.key, cfilter.value_type)"/>
+                        </t>
+                        <t t-elif="cfilter.value_type === 'number' || cfilter.value_type === 'many2one'">
+                            <input type="number" t-att-value="customFilterValue(cfilter.key)" t-att-placeholder="cfilter.placeholder" t-on-change="(ev) => this.onCustomFilterChange(ev, cfilter.key, cfilter.value_type)"/>
+                        </t>
+                        <t t-elif="cfilter.value_type === 'boolean'">
+                            <label class="vlf-switch-filter"><input type="checkbox" t-att-checked="customFilterValue(cfilter.key) === '1'" t-on-change="(ev) => this.onCustomFilterChange(ev, cfilter.key, cfilter.value_type)"/> <span>Sí</span></label>
+                        </t>
+                        <t t-else="">
+                            <input type="text" t-att-value="customFilterValue(cfilter.key)" t-att-placeholder="cfilter.placeholder" t-on-change="(ev) => this.onCustomFilterChange(ev, cfilter.key, cfilter.value_type)"/>
+                        </t>
+                        <small t-if="cfilter.help_text"><t t-esc="cfilter.help_text"/></small>
+                    </div>
+                </t>
+                <div class="vlf-filter-suggestions" t-if="state.dashboard.allow_instant_edit and (state.dashboard.suggested_filters || []).length">
+                    <div class="vlf-suggested-head">
+                        <button type="button" class="btn btn-link" t-on-click="toggleFilterSuggestions">
+                            <i class="fa fa-lightbulb-o"/> Filtros sugeridos
+                            <span class="vlf-badge"><t t-esc="(state.dashboard.suggested_filters || []).length"/></span>
+                        </button>
+                        <small>Basados en los modelos y campos usados por las tarjetas actuales.</small>
+                    </div>
+                    <div class="vlf-suggested-chips" t-if="state.filterSuggestionsOpen">
+                        <t t-foreach="state.dashboard.suggested_filters" t-as="suggestion" t-key="suggestion.key">
+                            <button type="button" class="vlf-suggested-chip" t-on-click="() => this.addSuggestedFilter(suggestion.key)">
+                                <i t-attf-class="fa #{suggestion.icon || 'fa-filter'}"/>
+                                <span>
+                                    <strong><t t-esc="suggestion.name"/></strong>
+                                    <small><t t-esc="suggestion.placeholder || suggestion.help_text || suggestion.field_name"/></small>
+                                </span>
+                                <em>Agregar</em>
+                            </button>
+                        </t>
+                    </div>
+                </div>
+                <div class="vlf-filter-group vlf-filter-actions">
+                    <button class="btn btn-primary" t-on-click="applyFilters"><i class="fa fa-filter"/> Aplicar filtros</button>
+                    <button class="btn btn-link" t-on-click="clearFilters">Limpiar</button>
+                </div>
+                <div class="vlf-streaming" t-if="state.dashboard.auto_refresh">
+                    <span class="vlf-dot"/> Streaming activo cada <t t-esc="state.dashboard.auto_refresh_seconds"/>s
+                </div>
+            </div>
+
+            <div class="vlf-builder-panel" t-if="state.builderOpen and state.dashboard.allow_instant_edit">
+                <div class="vlf-builder-head">
+                    <div>
+                        <strong><i class="fa fa-arrows"/> Constructor drag and drop</strong>
+                        <small>Arrastra un tipo de gráfica o un preset al área del dashboard. También puedes dar clic para agregarlo al final.</small>
+                    </div>
+                    <button class="btn btn-link" t-on-click="toggleBuilder">Cerrar</button>
+                </div>
+                <div class="vlf-builder-columns">
+                    <div class="vlf-builder-section">
+                        <h4>Tipos de elementos</h4>
+                        <div class="vlf-builder-chips">
+                            <t t-foreach="state.builder.chart_types" t-as="chart" t-key="chart.key">
+                                <button class="vlf-builder-chip" draggable="true"
+                                        t-on-click="() => this.createBuilderItem('type', chart.key)"
+                                        t-on-dragstart="(ev) => this.onBuilderDragStart(ev, 'type', chart.key)">
+                                    <i t-attf-class="fa #{chart.icon}"/> <span><t t-esc="chart.name"/></span>
+                                </button>
+                            </t>
+                        </div>
+                    </div>
+                    <div class="vlf-builder-section">
+                        <h4>Presets comerciales</h4>
+                        <div class="vlf-builder-chips vlf-builder-presets">
+                            <t t-foreach="state.builder.presets" t-as="preset" t-key="preset.key">
+                                <button class="vlf-builder-chip vlf-builder-preset" draggable="true"
+                                        t-on-click="() => this.createBuilderItem('preset', preset.key)"
+                                        t-on-dragstart="(ev) => this.onBuilderDragStart(ev, 'preset', preset.key)">
+                                    <i t-attf-class="fa #{preset.icon}"/>
+                                    <span><strong><t t-esc="preset.name"/></strong><small><t t-esc="preset.description"/></small></span>
+                                </button>
+                            </t>
+                        </div>
+                    </div>
+                </div>
+                <div class="vlf-builder-note">
+                    Tip: los presets respetan los filtros globales de fecha del dashboard cuando usan ventas, POS o facturación.
+                </div>
+            </div>
+
+            <div class="vlf-help-panel" t-if="state.helpOpen">
+                <div class="vlf-help-head">
+                    <div>
+                        <strong><i class="fa fa-question-circle"/> Ayuda rápida del dashboard</strong>
+                        <small>Guía práctica para filtros personalizados, presets comerciales y ejemplos de dominios.</small>
+                    </div>
+                    <button class="btn btn-link" t-on-click="toggleHelp">Cerrar</button>
+                </div>
+                <div class="vlf-help-grid">
+                    <div class="vlf-help-card">
+                        <h4>Crear un filtro personalizado</h4>
+                        <ol>
+                            <li>Usa <strong>Filtros sugeridos</strong> para agregarlos con un clic desde el dashboard.</li>
+                            <li>O abre <strong>Configurar filtros</strong> y agrega una línea manualmente.</li>
+                            <li>Define nombre, clave, campo técnico, tipo y operador.</li>
+                            <li>Guarda y vuelve al dashboard.</li>
+                        </ol>
+                        <p>El filtro se aplica automáticamente a cada gráfica cuyo modelo tenga el campo principal o alguno de sus campos alternos. Si no aplica a una tarjeta, se ignora para esa tarjeta.</p>
+                    </div>
+                    <div class="vlf-help-card">
+                        <h4>Campos frecuentes</h4>
+                        <ul>
+                            <li><strong>sale.order</strong>: partner_id, user_id, state, date_order, company_id.</li>
+                            <li><strong>sale.order.line</strong>: product_id, order_id.partner_id, order_id.user_id, order_id.state.</li>
+                            <li><strong>pos.order.line</strong>: product_id, order_id.partner_id, order_id.user_id.</li>
+                            <li><strong>account.move.line</strong>: product_id, move_id.partner_id, move_id.invoice_user_id.</li>
+                            <li><strong>Campos alternos</strong>: permiten que un mismo filtro funcione en varios modelos.</li>
+                        </ul>
+                    </div>
+                    <div class="vlf-help-card">
+                        <h4>Top productos vendidos</h4>
+                        <p>Usa el preset del Constructor o configúralo así:</p>
+                        <code>Modelo: sale.order.line | Medida: product_uom_qty | Agrupar: product_id | Orden: valor desc | Dominio: [('order_id.state','in',['sale','done']),('product_uom_qty','&gt;',0)]</code>
+                    </div>
+                    <div class="vlf-help-card">
+                        <h4>Productos menos vendidos</h4>
+                        <p>Misma configuración del top, pero con orden ascendente.</p>
+                        <code>Orden: valor asc | Límite: 10 | Nota: muestra productos con poca venta, no productos en cero absoluto.</code>
+                    </div>
+                    <div class="vlf-help-card">
+                        <h4>Top clientes por monto</h4>
+                        <code>Modelo: sale.order | Medida: amount_total | Agrupar: partner_id | Fecha: date_order | Dominio: [('state','in',['sale','done'])]</code>
+                    </div>
+                    <div class="vlf-help-card">
+                        <h4>Opciones manuales para filtro de estado</h4>
+                        <p>En un filtro tipo Selección, escribe una opción por línea:</p>
+                        <code>draft:Cotización
+sale:Venta confirmada
+done:Bloqueado
+cancel:Cancelado</code>
+                    </div>
+                </div>
+            </div>
+
+            <div class="vlf-dashboard-description" t-if="state.dashboard.description">
+                <t t-esc="state.dashboard.description"/>
+            </div>
+
+            <div class="vlf-empty" t-if="!state.items.length">
+                <i class="fa fa-info-circle"/> No hay items configurados en este dashboard.
+            </div>
+
+            <div class="vlf-dashboard-grid" t-on-dragover.prevent="onGridDragOver" t-on-drop="onGridDrop">
+                <t t-foreach="state.items" t-as="item" t-key="item.id">
+                    <div t-attf-class="vlf-card vlf-card-w#{item.width || '1'} vlf-card-h-#{item.height || 'medium'} vlf-type-#{item.type}" t-att-data-item-card="item.id"
+                         t-att-draggable="state.dashboard.allow_instant_edit ? 'true' : 'false'"
+                         t-on-dragstart="(ev) => this.onCardDragStart(ev, item.id)"
+                         t-on-dragover.prevent="onCardDragOver"
+                         t-on-drop="(ev) => this.onCardDrop(ev, item.id)">
+                        <div class="vlf-card-header">
+                            <div>
+                                <h3><i t-attf-class="fa #{item.icon || 'fa-bar-chart'}"/> <t t-esc="item.name"/></h3>
+                                <small t-if="item.help_text"><t t-esc="item.help_text"/></small>
+                            </div>
+                            <div class="vlf-card-menu">
+                                <span title="Arrastrar para reordenar" class="vlf-drag-handle" t-if="state.dashboard.allow_instant_edit"><i class="fa fa-arrows"/></span>
+                                <button title="Ver datos" t-if="item.allow_drill_down" t-on-click="() => this.openRecords(item.id)"><i class="fa fa-external-link"/></button>
+                                <button title="Editar" t-if="state.dashboard.allow_instant_edit" t-on-click="() => this.editItem(item.id)"><i class="fa fa-pencil"/></button>
+                                <button title="PNG" t-if="state.dashboard.allow_export" t-on-click="() => this.exportItemPNG(item.id)"><i class="fa fa-image"/></button>
+                            </div>
+                        </div>
+
+                        <t t-if="item.type === 'error'">
+                            <div class="vlf-error"><i class="fa fa-warning"/> <t t-esc="item.message"/></div>
+                        </t>
+                        <t t-elif="item.type === 'tile'">
+                            <div class="vlf-tile-body">
+                                <div class="vlf-tile-value" t-att-data-format-value="item.total" t-att-data-item-id="item.id"><t t-esc="formatNumber(item.total, item)"/></div>
+                                <div class="vlf-tile-target" t-if="item.show_target and item.target_value">Meta: <t t-esc="formatNumber(item.target_value, item)"/></div>
+                            </div>
+                        </t>
+                        <t t-elif="item.type === 'list'">
+                            <div t-attf-class="vlf-list-container vlf-list-#{item.list_style || 'table'}" t-att-data-list-id="item.id"/>
+                        </t>
+                        <t t-elif="item.type === 'todo'">
+                            <div class="vlf-todo-container" t-att-data-todo-id="item.id"/>
+                        </t>
+                        <t t-else="">
+                            <div class="vlf-chart" t-att-data-chart-id="item.id" t-att-data-chart-type="item.type"/>
+                            <div class="vlf-card-footer" t-if="item.show_total">
+                                Total: <strong><t t-esc="formatNumber(item.total, item)"/></strong>
+                                <span t-if="item.show_target and item.target_value"> | <t t-esc="item.target_label"/>: <strong><t t-esc="formatNumber(item.target_value, item)"/></strong></span>
+                            </div>
+                        </t>
+                    </div>
+                </t>
+            </div>
+        </div>
+    </t>
+</templates>

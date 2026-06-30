@@ -1,0 +1,138 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_vlf_dashboard_item_list" model="ir.ui.view">
+        <field name="name">vlf.dashboard.item.list</field>
+        <field name="model">vlf.dashboard.item</field>
+        <field name="arch" type="xml">
+            <list string="Items de dashboard">
+                <field name="sequence" widget="handle"/>
+                <field name="dashboard_id"/>
+                <field name="name"/>
+                <field name="item_type"/>
+                <field name="data_source"/>
+                <field name="model_id"/>
+                <field name="dataset_id"/>
+                <field name="measure_field_id"/>
+                <field name="groupby_field_id"/>
+                <field name="aggregation"/>
+                <field name="limit"/>
+                <field name="active"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_vlf_dashboard_item_form" model="ir.ui.view">
+        <field name="name">vlf.dashboard.item.form</field>
+        <field name="model">vlf.dashboard.item</field>
+        <field name="arch" type="xml">
+            <form string="Item de dashboard">
+                <sheet>
+                    <div class="oe_title">
+                        <h1><field name="name" placeholder="Nombre del indicador"/></h1>
+                    </div>
+                    <group>
+                        <group>
+                            <field name="dashboard_id"/>
+                            <field name="active"/>
+                            <field name="sequence"/>
+                            <field name="item_type"/>
+                            <field name="icon"/>
+                            <field name="help_text"/>
+                        </group>
+                        <group>
+                            <field name="width"/>
+                            <field name="height"/>
+                            <field name="color_palette"/>
+                            <field name="custom_color" placeholder="#44546A"/>
+                            <field name="background_color" placeholder="#FFFFFF"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="Datos">
+                            <group>
+                                <group>
+                                    <field name="data_source"/>
+                                    <field name="model_id" invisible="data_source != 'odoo'"/>
+                                    <field name="dataset_id" invisible="data_source != 'dataset'"/>
+                                    <field name="dataset_group_key" invisible="data_source != 'dataset'"/>
+                                    <field name="dataset_measure_key" invisible="data_source != 'dataset'"/>
+                                    <field name="domain" invisible="data_source != 'odoo'"/>
+                                </group>
+                                <group>
+                                    <field name="aggregation"/>
+                                    <field name="measure_field_id" invisible="data_source != 'odoo'"/>
+                                    <field name="groupby_field_id" invisible="data_source != 'odoo'"/>
+                                    <field name="subgroup_field_id" invisible="data_source != 'odoo'"/>
+                                    <field name="date_field_id" invisible="data_source != 'odoo'"/>
+                                    <field name="groupby_interval"/>
+                                </group>
+                            </group>
+                            <group>
+                                <field name="list_field_ids" widget="many2many_tags" invisible="item_type != 'list' or data_source != 'odoo'"/>
+                            </group>
+                        </page>
+                        <page string="Filtro, orden y límites">
+                            <group>
+                                <group>
+                                    <field name="limit"/>
+                                    <field name="sort_by"/>
+                                    <field name="sort_direction"/>
+                                    <field name="cumulative"/>
+                                </group>
+                                <group>
+                                    <field name="allow_drill_down"/>
+                                    <field name="open_view_mode"/>
+                                    <field name="list_style"/>
+                                </group>
+                            </group>
+                        </page>
+                        <page string="Meta y unidades">
+                            <group>
+                                <group>
+                                    <field name="target_value"/>
+                                    <field name="target_label"/>
+                                    <field name="show_target"/>
+                                    <field name="show_values"/>
+                                    <field name="show_legend"/>
+                                    <field name="show_total"/>
+                                </group>
+                                <group>
+                                    <field name="currency_id"/>
+                                    <field name="unit_prefix"/>
+                                    <field name="unit_suffix"/>
+                                    <field name="number_system"/>
+                                    <field name="precision_digits"/>
+                                </group>
+                            </group>
+                        </page>
+                    </notebook>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_vlf_dashboard_item_search" model="ir.ui.view">
+        <field name="name">vlf.dashboard.item.search</field>
+        <field name="model">vlf.dashboard.item</field>
+        <field name="arch" type="xml">
+            <search string="Items">
+                <field name="name"/>
+                <field name="dashboard_id"/>
+                <field name="model_id"/>
+                <filter name="active" string="Activos" domain="[('active','=',True)]"/>
+                <group expand="0" string="Agrupar por">
+                    <filter name="group_dashboard" string="Dashboard" context="{'group_by': 'dashboard_id'}"/>
+                    <filter name="group_type" string="Tipo" context="{'group_by': 'item_type'}"/>
+                    <filter name="group_source" string="Fuente" context="{'group_by': 'data_source'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_vlf_dashboard_item" model="ir.actions.act_window">
+        <field name="name">Items de Dashboard</field>
+        <field name="res_model">vlf.dashboard.item</field>
+        <field name="view_mode">list,form</field>
+        <field name="context">{'search_default_active': 1}</field>
+    </record>
+</odoo>

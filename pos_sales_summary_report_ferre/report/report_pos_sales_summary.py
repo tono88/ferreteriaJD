@@ -1,0 +1,280 @@
+
+# -*- coding: utf-8 -*-
+from odoo import api, fields, models, _
+
+class ReportPosSalesSummary(models.AbstractModel):
+    _name = "report.pos_sales_summary_report_ferre.report_pos_sales_summary"
+    _description = "Reporte PDF: Resumen de ventas POS"
+    @staticmethod
+    def _has_valid_invoice(o):
+        move = getattr(o, "account_move", False)
+        if not move:
+            return False
+        return getattr(move, "state", False) == "posted"
+    @staticmethod
+    def _is_invoiced_without_move(o):
+        """Orden marcada como facturada pero sin factura enlazada (factura eliminada)."""
+        return o.state == "invoiced" and not getattr(o, "account_move", False)
+
+
+    def _normalize_pos_config_id(self, data):
+        """Devuelve el ID (int) del pos.config o None, ya venga plano o en data['form']."""
+        if not data:
+            return None
+        # Caso A: lo mandaste plano
+        val = data.get("pos_config_id")
+        if val:
+            if isinstance(val, (list, tuple)):
+                    return int(val[0])
+            return int(val)
+        # Caso B: viene en 'form'
+        form = data.get("form")
+        if isinstance(form, dict) and form.get("pos_config_id"):
+            val = form["pos_config_id"]
+            if isinstance(val, (list, tuple)):
+                return int(val[0])
+            return int(val)
+        return None
+
+    def _is_cash_method(self, method):
+        if not method:
+            return False
+        # Método efectivo (POS v18: flag is_cash_count)
+        if getattr(method, "is_cash_count", False):
+            return True
+        jrnl = getattr(method, "journal_id", False)
+        if jrnl and getattr(jrnl, "is_cash_count", False):
+            return True
+        t = getattr(method, "type", None)
+        return isinstance(t, str) and t.lower() == "cash"
+
+    def _split_payments(self, order):
+        contado = 0.0
+        credito = 0.0
+        for p in order.payment_ids:
+            # <<< AÑADE ESTAS LÍNEAS >>>
+            amt = p.amount or 0.0
+            if amt <= 0:
+                continue
+            # ---------------------------
+            if self._is_cash_method(getattr(p, "payment_method_id", False)):
+                contado += p.amount or 0.0
+            else:
+                credito += p.amount or 0.0
+        return contado, credito
+
+    def _fmt_amount(self, amt, currency):
+        amt = amt or 0.0
+        text = "{:,.2f}".format(amt)
+        if not currency:
+            return text
+        if getattr(currency, "position", "before") == "before":
+            return f"{currency.symbol} {text}"
+        return f"{text} {currency.symbol}"
+
+    def _line_from_order(self, order, currency):
+        partner = order.partner_id.name or _("Consumidor Final")
+        move = getattr(order, "account_move", False)
+        #factura = move.name if move else "-"
+        firma = "-"
+        if move:
+            # usa firma_fel si existe; si no, cae al nombre (número) de la factura
+            firma = getattr(move, "firma_fel", False) or move.name or "-"
+
+        contado, credito = self._split_payments(order)
+        total = order.amount_total or 0.0
+        return {
+            "partner": partner,
+            "correlative": getattr(order, "internal_correlative", "") or "-",
+            #"invoice": factura,
+            "invoice": firma,          # <--- aquí
+            "contado": contado,
+            "credito": credito,
+            "total": total,
+            "contado_fmt": self._fmt_amount(contado, currency),
+            "credito_fmt": self._fmt_amount(credito, currency),
+            "total_fmt": self._fmt_amount(total, currency),
+            "order_name": order.name,
+        }
+
+    @api.model
+    def _get_report_values(self, docids, data=None):
+        data = data or {}
+        start_utc = data.get("start_utc")
+        end_utc = data.get("end_utc")
+        invoice_filter = data.get("invoice_filter", "all")
+        # 👇 NUEVO: siempre define pos_config_id
+        pos_config_id = self._normalize_pos_config_id(data)
+        # 👇 NUEVO: lista de clientes seleccionados
+        partner_ids = data.get("partner_ids") or []
+        if isinstance(partner_ids, int):
+            partner_ids = [partner_ids]
+            
+        # 👇 NUEVO: flag para alternar vista
+        order_by_correlative = bool(data.get("order_by_internal_correlative"))
+            
+            
+            
+            
+        #domain = [
+        #    ("state", "in", ["paid", "done", "invoiced"]),
+        #    ("state", "!=", "cancel"),   # ⬅️ añade esta línea
+        #    ("date_order", ">=", start_utc),
+        #    ("date_order", "<=", end_utc),
+        #]
+        #if invoice_filter == "invoiced":
+        #    domain += [("account_move", "!=", False)]
+        #elif invoice_filter == "not_invoiced":
+        #    domain += [("account_move", "=", False)]
+            
+        domain = [
+            ("state", "in", ["paid", "done", "invoiced"]),
+            ("state", "!=", "cancel"),   # ⬅️ mantiene fuera las órdenes canceladas
+            ("date_order", ">=", start_utc),
+            ("date_order", "<=", end_utc),
+        ]
+        # Nota: el caso "not_invoiced" se filtrará más abajo en Python,
+        # para poder incluir también las órdenes con factura cancelada.
+        if invoice_filter == "invoiced":
+            # pequeña optimización: solo traemos órdenes que tengan alguna factura enlazada
+            domain += [("account_move", "!=", False)]
+          
+                    
+            
+        # 👇 CAMBIO: usar OR entre config_id y session_id.config_id
+        if pos_config_id:
+            domain += ["|", ("config_id", "=", pos_config_id), ("session_id.config_id", "=", pos_config_id)]
+        # 👇 NUEVO: filtrar por clientes si se seleccionaron
+        if partner_ids:
+            domain.append(("partner_id", "in", partner_ids))
+        orders = self.env["pos.order"].search(domain, order="partner_id, date_order, name")
+        # --- EXCLUIR ORDENES ORIGEN QUE TENGAN UN REEMBOLSO EN EL RANGO ---
+        # Detectar reembolsos por nombre "REEMBOLSO DE …" y excluir su orden original
+        refund_domain = [
+            ("state", "in", ["paid", "done", "invoiced"]),
+            ("date_order", ">=", start_utc),
+            ("date_order", "<=", end_utc),
+            ("amount_total", "<", 0),  # reembolsos suelen tener total negativo
+        ]
+        
+        # 👇 nuevo también para reembolsos
+        if pos_config_id:
+            refund_domain += ["|", ("config_id", "=", pos_config_id), ("session_id.config_id", "=", pos_config_id)]
+
+        refund_orders = self.env["pos.order"].search(refund_domain)
+        if partner_ids:
+            refund_domain.append(("partner_id", "in", partner_ids))
+        # Extraer nombres originales desde "REEMBOLSO DE <NOMBRE-ORIGINAL>"
+        orig_names = []
+        for r in refund_orders:
+            n = (r.name or "").strip()
+            if n.upper().startswith("REEMBOLSO DE "):
+                orig_names.append(n.split("REEMBOLSO DE ", 1)[1].strip())
+
+        # Filtrar fuera esas órdenes originales del conjunto a reportar
+        if orig_names:
+            orders = orders.filtered(lambda o: o.name not in orig_names)
+        # --- FIN EXCLUSION ---
+
+        # --- Normalizar según el estado real de la factura asociada ---
+        # Consideramos "factura válida" únicamente cuando el move está en estado 'posted'.
+        # Esto evita que aparezcan en el reporte:
+        #   - Órdenes en estado FACTURADO pero cuya factura fue cancelada.
+        #   - Órdenes en estado FACTURADO pero a las que ya se les eliminó la factura.
+
+#        if invoice_filter == "all":
+#            # Dejamos:
+#            #   - todas las órdenes pagadas/done que NO están marcadas como facturadas
+#            #   - y solo las facturadas cuya factura siga vigente (posted)
+#            orders = orders.filtered(
+#                lambda o: o.state != "invoiced" or _has_valid_invoice(o)
+#            )
+#        elif invoice_filter == "invoiced":
+#            # Solo órdenes con factura vigente
+#            orders = orders.filtered(_has_valid_invoice)
+#        elif invoice_filter == "not_invoiced":
+#            # Órdenes sin factura o con factura cancelada/borrador
+#            orders = orders.filtered(lambda o: not _has_valid_invoice(o))
+#        # --- FIN NORMALIZACIÓN FACTURA ---
+
+        if invoice_filter == "all":
+            # Igual que antes, pero explícitamente dejamos fuera las
+            # órdenes facturadas sin factura enlazada.
+            orders = orders.filtered(
+                lambda o: (o.state != "invoiced" or self._has_valid_invoice(o))
+                and not self._is_invoiced_without_move(o)
+            )
+
+        elif invoice_filter == "invoiced":
+            # Solo órdenes con factura vigente (posted)
+            orders = orders.filtered(self._has_valid_invoice)
+
+        elif invoice_filter == "not_invoiced":
+            # Solo órdenes que NO están en estado facturado.
+            # Si la orden está en estado 'invoiced', se excluye aunque su factura esté cancelada.
+            orders = orders.filtered(lambda o: o.state != "invoiced")
+
+
+
+        currency = self.env.company.currency_id
+        lines = []
+        invs = []
+        for o in orders:
+            L = self._line_from_order(o, currency)
+            if L["contado"] == 0 and L["credito"] == 0:
+                continue
+            lines.append(L)
+            
+
+            if L["invoice"] and L["invoice"] != "-":
+                invs.append(L["invoice"])
+
+        total_contado = sum(l["contado"] for l in lines)
+        total_credito = sum(l["credito"] for l in lines)
+        total_general = sum(l["total"] for l in lines)
+        
+        
+        # 👇 NUEVO: lista lineal ordenada por correlativo interno
+        if order_by_correlative:
+            def _correlative_key(line):
+                corr = line.get("correlative") or ""
+                try:
+                    return (0, int(corr))
+                except (TypeError, ValueError):
+                    return (1, str(corr))
+            lines_linear = sorted(lines, key=_correlative_key)
+        else:
+            # modo original: simplemente usamos la lista tal cual
+            lines_linear = lines
+
+
+        # Agrupar por partner
+        grouped_map = {}
+        for l in lines:
+            grouped_map.setdefault(l["partner"], []).append(l)
+        grouped_list = [{"partner": k, "lines": v} for k, v in grouped_map.items()]
+        grouped_list.sort(key=lambda g: g["partner"] or "")
+
+        first_inv = invs[0] if invs else "-"
+        last_inv = invs[-1] if invs else "-"
+
+        now_dt = fields.Datetime.context_timestamp(self.env.user, fields.Datetime.now())
+        return {
+            "doc_ids": docids,
+            "doc_model": "pos.order",
+            "data": data,
+            "grouped": grouped_list,
+            # 👇 NUEVO: lista plana para vista lineal por correlativo
+            "lines_linear": lines_linear,
+            "total_contado": total_contado,
+            "total_credito": total_credito,
+            "total_general": total_general,
+            "total_contado_fmt": self._fmt_amount(total_contado, currency),
+            "total_credito_fmt": self._fmt_amount(total_credito, currency),
+            "total_general_fmt": self._fmt_amount(total_general, currency),
+            "first_invoice": first_inv,
+            "last_invoice": last_inv,
+            "user_label": self.env.user.name,
+            "now_label": now_dt.strftime("%d/%m/%Y %I:%M:%S %p"),
+            "company": self.env.company,
+        }

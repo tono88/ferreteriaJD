@@ -1,0 +1,291 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates id="template" xml:space="preserve">
+    <t t-name="ferreteria_pos_transfer_request_ferre.TransferRequestPopup">
+        <Dialog title="'Solicitudes a otras sucursales'" size="'xl'" footer="false">
+            <div class="o_ferreteria_transfer_request_popup">
+                <div class="o_ferreteria_request_origin">
+                    <div>
+                        <span class="text-muted">Punto de venta solicitante</span>
+                        <strong t-esc="props.posConfigName"/>
+                    </div>
+                    <div>
+                        <span class="text-muted">Sucursal solicitante</span>
+                        <strong t-esc="props.requestingWarehouseName"/>
+                    </div>
+                </div>
+
+                <div class="nav nav-tabs o_ferreteria_request_tabs">
+                    <button type="button"
+                            t-att-class="state.activeTab === 'new' ? 'nav-link active' : 'nav-link'"
+                            t-on-click="() => this.setTab('new')">
+                        Nueva solicitud
+                    </button>
+                    <button type="button"
+                            t-att-class="state.activeTab === 'status' ? 'nav-link active' : 'nav-link'"
+                            t-on-click="() => this.setTab('status')">
+                        Mis solicitudes
+                    </button>
+                </div>
+
+                <div t-if="state.activeTab === 'new'" class="o_ferreteria_request_new">
+                    <div class="o_ferreteria_request_grid">
+                        <div class="o_ferreteria_field">
+                            <label>Sucursal suministradora</label>
+                            <select class="form-select"
+                                    t-model="state.supplyingWarehouseId"
+                                    t-on-change="onSupplierChange">
+                                <option value="">Seleccione una sucursal...</option>
+                                <t t-foreach="props.supplyingWarehouses" t-as="warehouse" t-key="warehouse.id">
+                                    <option t-att-value="warehouse.id" t-esc="warehouse.name"/>
+                                </t>
+                            </select>
+                        </div>
+
+                        <div class="o_ferreteria_field o_ferreteria_partner_field">
+                            <label>Cliente interesado (opcional)</label>
+                            <div class="input-group">
+                                <input class="form-control"
+                                       placeholder="Buscar por nombre, referencia, teléfono o correo"
+                                       t-model="state.partnerSearch"
+                                       t-on-keydown="onPartnerSearchKeydown"/>
+                                <button type="button" class="btn btn-outline-secondary"
+                                        t-on-click="searchPartners"
+                                        t-att-disabled="state.searchingPartners">
+                                    <i class="fa fa-search"/>
+                                </button>
+                            </div>
+                            <select class="form-select mt-2" t-model="state.selectedPartnerId">
+                                <option value="">Sin cliente</option>
+                                <t t-foreach="state.partnerResults" t-as="partner" t-key="partner.id">
+                                    <option t-att-value="partner.id">
+                                        <t t-esc="partner.name"/>
+                                        <t t-if="partner.ref"> — <t t-esc="partner.ref"/></t>
+                                    </option>
+                                </t>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="o_ferreteria_field mt-3">
+                        <label>Observación</label>
+                        <textarea class="form-control" rows="2"
+                                  placeholder="Detalle opcional de la solicitud"
+                                  t-model="state.requestNote"/>
+                    </div>
+
+                    <div class="o_ferreteria_product_box mt-3">
+                        <div class="o_ferreteria_product_search">
+                            <div class="o_ferreteria_field o_ferreteria_product_lookup flex-grow-1">
+                                <label>Buscar producto almacenable</label>
+                                <div class="input-group">
+                                    <span class="input-group-text"><i class="fa fa-search"/></span>
+                                    <input class="form-control"
+                                           placeholder="Escriba nombre, referencia interna o código de barras"
+                                           t-att-value="state.productSearch"
+                                           t-on-input="onProductSearchInput"
+                                           t-on-focus="onProductSearchFocus"
+                                           t-on-blur="onProductSearchBlur"
+                                           t-on-keydown="onProductSearchKeydown"
+                                           t-att-disabled="!state.supplyingWarehouseId"
+                                           autocomplete="off"/>
+                                    <button t-if="state.productSearch"
+                                            type="button"
+                                            class="btn btn-outline-secondary"
+                                            title="Limpiar búsqueda"
+                                            t-on-click="clearSelectedProduct">
+                                        <i class="fa fa-times"/>
+                                    </button>
+                                </div>
+
+                                <div t-if="state.productSearchOpen"
+                                     class="o_ferreteria_product_suggestions shadow-sm">
+                                    <div t-if="state.searchingProducts"
+                                         class="o_ferreteria_product_suggestion_status">
+                                        <i class="fa fa-spinner fa-spin me-2"/> Buscando productos…
+                                    </div>
+                                    <div t-elif="!state.productResults.length"
+                                         class="o_ferreteria_product_suggestion_status text-muted">
+                                        No se encontraron coincidencias.
+                                    </div>
+                                    <t t-else="">
+                                        <button t-foreach="state.productResults"
+                                                t-as="product"
+                                                t-key="product.id"
+                                                type="button"
+                                                t-att-class="product_index === state.highlightedProductIndex ? 'o_ferreteria_product_suggestion active' : 'o_ferreteria_product_suggestion'"
+                                                t-on-mouseenter="() => this.setHighlightedProduct(product_index)"
+                                                t-on-click="() => this.selectProduct(product)">
+                                            <span class="o_ferreteria_product_suggestion_main">
+                                                <strong>
+                                                    <t t-if="product.default_code">[<t t-esc="product.default_code"/>] </t>
+                                                    <t t-esc="product.name"/>
+                                                </strong>
+                                                <small class="text-muted">
+                                                    <t t-if="product.barcode">Código de barras: <t t-esc="product.barcode"/></t>
+                                                    <t t-if="product.barcode and product.tracking"> · </t>
+                                                    <t t-if="product.tracking" t-esc="trackingLabel(product.tracking)"/>
+                                                </small>
+                                            </span>
+                                            <span class="o_ferreteria_product_suggestion_stock">
+                                                <small>Disponible</small>
+                                                <strong><t t-esc="formatQty(product.available_qty)"/> <t t-esc="product.uom_name"/></strong>
+                                            </span>
+                                        </button>
+                                    </t>
+                                </div>
+
+                                <div t-if="selectedProduct" class="o_ferreteria_selected_product mt-2">
+                                    <span>
+                                        <i class="fa fa-check-circle me-1"/>
+                                        Producto seleccionado:
+                                        <strong>
+                                            <t t-if="selectedProduct.default_code">[<t t-esc="selectedProduct.default_code"/>] </t>
+                                            <t t-esc="selectedProduct.name"/>
+                                        </strong>
+                                    </span>
+                                    <span class="text-muted">
+                                        Disponible: <t t-esc="formatQty(selectedProduct.available_qty)"/>
+                                        <t t-esc="selectedProduct.uom_name"/>
+                                    </span>
+                                </div>
+                            </div>
+                            <div class="o_ferreteria_field o_ferreteria_qty_field">
+                                <label>Cantidad</label>
+                                <input type="number" min="0.0001" step="any"
+                                       class="form-control"
+                                       t-model="state.requestedQty"/>
+                            </div>
+                            <div class="o_ferreteria_add_line">
+                                <button type="button" class="btn btn-secondary"
+                                        t-on-click="addLine"
+                                        t-att-disabled="!state.selectedProductId">
+                                    <i class="fa fa-plus me-1"/> Agregar
+                                </button>
+                            </div>
+                        </div>
+                        <div class="small text-muted mt-2">
+                            La búsqueda se ejecuta automáticamente al escribir. También puede usar la referencia interna o escanear el código de barras. La existencia es informativa y se validará nuevamente al aprobar.
+                        </div>
+                    </div>
+
+                    <div class="o_ferreteria_lines mt-3">
+                        <table class="table table-sm table-hover align-middle mb-0">
+                            <thead>
+                                <tr>
+                                    <th>Producto</th>
+                                    <th>Seguimiento</th>
+                                    <th class="text-end">Disponible</th>
+                                    <th class="text-end">Solicitada</th>
+                                    <th>Unidad</th>
+                                    <th>Observación de línea</th>
+                                    <th></th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr t-if="!state.lines.length">
+                                    <td colspan="7" class="text-center text-muted py-4">
+                                        Todavía no se han agregado productos.
+                                    </td>
+                                </tr>
+                                <t t-foreach="state.lines" t-as="line" t-key="line.product_id">
+                                    <tr>
+                                        <td>
+                                            <t t-if="line.default_code">[<t t-esc="line.default_code"/>] </t>
+                                            <t t-esc="line.product_name"/>
+                                        </td>
+                                        <td t-esc="trackingLabel(line.tracking)"/>
+                                        <td class="text-end" t-esc="formatQty(line.available_qty)"/>
+                                        <td class="text-end">
+                                            <input type="number" min="0.0001" step="any"
+                                                   class="form-control form-control-sm text-end o_ferreteria_line_qty"
+                                                   t-model="line.qty"/>
+                                        </td>
+                                        <td t-esc="line.uom_name"/>
+                                        <td>
+                                            <input class="form-control form-control-sm"
+                                                   placeholder="Opcional"
+                                                   t-model="line.note"/>
+                                        </td>
+                                        <td class="text-end">
+                                            <button type="button" class="btn btn-link text-danger"
+                                                    t-on-click="() => this.removeLine(line_index)">
+                                                <i class="fa fa-trash"/>
+                                            </button>
+                                        </td>
+                                    </tr>
+                                </t>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div class="o_ferreteria_request_footer mt-3">
+                        <button type="button" class="btn btn-light" t-on-click="props.close">
+                            Cerrar
+                        </button>
+                        <button type="button" class="btn btn-primary"
+                                t-on-click="submitRequest"
+                                t-att-disabled="state.submitting || !state.lines.length">
+                            <i class="fa fa-paper-plane me-1"/>
+                            Enviar solicitud
+                        </button>
+                    </div>
+                </div>
+
+                <div t-if="state.activeTab === 'status'" class="o_ferreteria_request_status">
+                    <div class="d-flex justify-content-between align-items-center my-3">
+                        <div class="text-muted">Últimas solicitudes creadas por este usuario desde este POS.</div>
+                        <button type="button" class="btn btn-outline-secondary"
+                                t-on-click="refreshRecentRequests"
+                                t-att-disabled="state.loadingRecent">
+                            <i class="fa fa-refresh me-1"/> Actualizar
+                        </button>
+                    </div>
+                    <div class="o_ferreteria_status_table">
+                        <table class="table table-sm table-hover align-middle mb-0">
+                            <thead>
+                                <tr>
+                                    <th>Referencia</th>
+                                    <th>Fecha</th>
+                                    <th>Suministradora</th>
+                                    <th>Estado</th>
+                                    <th class="text-end">Solicitado</th>
+                                    <th class="text-end">Aprobado</th>
+                                    <th class="text-end">Despachado</th>
+                                    <th class="text-end">Recibido</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr t-if="!state.recentRequests.length">
+                                    <td colspan="8" class="text-center text-muted py-4">
+                                        No hay solicitudes creadas desde este punto de venta.
+                                    </td>
+                                </tr>
+                                <t t-foreach="state.recentRequests" t-as="request" t-key="request.id">
+                                    <tr>
+                                        <td><strong t-esc="request.name"/></td>
+                                        <td t-esc="request.request_date"/>
+                                        <td t-esc="request.supplying_warehouse"/>
+                                        <td>
+                                            <span t-att-class="stateClass(request.state)"
+                                                  t-esc="request.state_label"/>
+                                        </td>
+                                        <td class="text-end" t-esc="formatQty(request.requested_qty)"/>
+                                        <td class="text-end" t-esc="formatQty(request.approved_qty)"/>
+                                        <td class="text-end" t-esc="formatQty(request.dispatched_qty)"/>
+                                        <td class="text-end" t-esc="formatQty(request.received_qty)"/>
+                                    </tr>
+                                </t>
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="o_ferreteria_request_footer mt-3">
+                        <button type="button" class="btn btn-light" t-on-click="props.close">Cerrar</button>
+                        <button type="button" class="btn btn-primary" t-on-click="() => this.setTab('new')">
+                            Nueva solicitud
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </Dialog>
+    </t>
+</templates>

@@ -1,0 +1,146 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="module_category_ferreteria_transfer" model="ir.module.category">
+        <field name="name">Solicitudes entre sucursales</field>
+        <field name="description">Roles técnicos sincronizados desde los permisos por sucursal y punto de venta.</field>
+        <field name="sequence">35</field>
+    </record>
+
+    <record id="group_transfer_requester" model="res.groups">
+        <field name="name">Solicitante de productos</field>
+        <field name="category_id" ref="module_category_ferreteria_transfer"/>
+        <field name="implied_ids" eval="[(4, ref('stock.group_stock_user'))]"/>
+    </record>
+
+    <record id="group_transfer_approver" model="res.groups">
+        <field name="name">Aprobador de sucursal</field>
+        <field name="category_id" ref="module_category_ferreteria_transfer"/>
+        <field name="implied_ids" eval="[(4, ref('stock.group_stock_user'))]"/>
+    </record>
+
+    <record id="group_transfer_dispatcher" model="res.groups">
+        <field name="name">Despachador de sucursal</field>
+        <field name="category_id" ref="module_category_ferreteria_transfer"/>
+        <field name="implied_ids" eval="[(4, ref('stock.group_stock_user'))]"/>
+    </record>
+
+    <record id="group_transfer_receiver" model="res.groups">
+        <field name="name">Receptor de sucursal</field>
+        <field name="category_id" ref="module_category_ferreteria_transfer"/>
+        <field name="implied_ids" eval="[(4, ref('stock.group_stock_user'))]"/>
+    </record>
+
+    <record id="group_transfer_request_admin" model="res.groups">
+        <field name="name">Administrador de solicitudes</field>
+        <field name="category_id" ref="module_category_ferreteria_transfer"/>
+        <field name="implied_ids" eval="[(4, ref('group_transfer_requester')), (4, ref('group_transfer_approver')), (4, ref('group_transfer_dispatcher')), (4, ref('group_transfer_receiver'))]"/>
+    </record>
+
+    <!-- Solicitudes -->
+    <record id="rule_transfer_request_requester" model="ir.rule">
+        <field name="name">Solicitudes: propias del solicitante</field>
+        <field name="model_id" ref="model_ferreteria_transfer_request"/>
+        <field name="domain_force">[('requester_id', '=', user.id)]</field>
+        <field name="groups" eval="[(4, ref('group_transfer_requester'))]"/>
+    </record>
+
+    <record id="rule_transfer_request_approver" model="ir.rule">
+        <field name="name">Solicitudes: sucursales donde puede aprobar</field>
+        <field name="model_id" ref="model_ferreteria_transfer_request"/>
+        <field name="domain_force">[('supplying_warehouse_id', 'in', user.ferreteria_approve_warehouse_ids.ids)]</field>
+        <field name="groups" eval="[(4, ref('group_transfer_approver'))]"/>
+    </record>
+
+    <record id="rule_transfer_request_dispatcher" model="ir.rule">
+        <field name="name">Solicitudes: sucursales donde puede despachar</field>
+        <field name="model_id" ref="model_ferreteria_transfer_request"/>
+        <field name="domain_force">[('supplying_warehouse_id', 'in', user.ferreteria_dispatch_warehouse_ids.ids)]</field>
+        <field name="groups" eval="[(4, ref('group_transfer_dispatcher'))]"/>
+    </record>
+
+    <record id="rule_transfer_request_receiver" model="ir.rule">
+        <field name="name">Solicitudes: sucursales donde puede recibir</field>
+        <field name="model_id" ref="model_ferreteria_transfer_request"/>
+        <field name="domain_force">[('requesting_warehouse_id', 'in', user.ferreteria_receive_warehouse_ids.ids)]</field>
+        <field name="groups" eval="[(4, ref('group_transfer_receiver'))]"/>
+    </record>
+
+    <record id="rule_transfer_request_admin" model="ir.rule">
+        <field name="name">Solicitudes: administrador ve todas</field>
+        <field name="model_id" ref="model_ferreteria_transfer_request"/>
+        <field name="domain_force">[(1, '=', 1)]</field>
+        <field name="groups" eval="[(4, ref('group_transfer_request_admin'))]"/>
+    </record>
+
+    <!-- Líneas -->
+    <record id="rule_transfer_line_requester" model="ir.rule">
+        <field name="name">Líneas: propias del solicitante</field>
+        <field name="model_id" ref="model_ferreteria_transfer_request_line"/>
+        <field name="domain_force">[('request_id.requester_id', '=', user.id)]</field>
+        <field name="groups" eval="[(4, ref('group_transfer_requester'))]"/>
+    </record>
+
+    <record id="rule_transfer_line_approver" model="ir.rule">
+        <field name="name">Líneas: sucursales donde puede aprobar</field>
+        <field name="model_id" ref="model_ferreteria_transfer_request_line"/>
+        <field name="domain_force">[('request_id.supplying_warehouse_id', 'in', user.ferreteria_approve_warehouse_ids.ids)]</field>
+        <field name="groups" eval="[(4, ref('group_transfer_approver'))]"/>
+    </record>
+
+    <record id="rule_transfer_line_dispatcher" model="ir.rule">
+        <field name="name">Líneas: sucursales donde puede despachar</field>
+        <field name="model_id" ref="model_ferreteria_transfer_request_line"/>
+        <field name="domain_force">[('request_id.supplying_warehouse_id', 'in', user.ferreteria_dispatch_warehouse_ids.ids)]</field>
+        <field name="groups" eval="[(4, ref('group_transfer_dispatcher'))]"/>
+    </record>
+
+    <record id="rule_transfer_line_receiver" model="ir.rule">
+        <field name="name">Líneas: sucursales donde puede recibir</field>
+        <field name="model_id" ref="model_ferreteria_transfer_request_line"/>
+        <field name="domain_force">[('request_id.requesting_warehouse_id', 'in', user.ferreteria_receive_warehouse_ids.ids)]</field>
+        <field name="groups" eval="[(4, ref('group_transfer_receiver'))]"/>
+    </record>
+
+    <record id="rule_transfer_line_admin" model="ir.rule">
+        <field name="name">Líneas: administrador ve todas</field>
+        <field name="model_id" ref="model_ferreteria_transfer_request_line"/>
+        <field name="domain_force">[(1, '=', 1)]</field>
+        <field name="groups" eval="[(4, ref('group_transfer_request_admin'))]"/>
+    </record>
+
+    <!-- Incidencias -->
+    <record id="rule_transfer_incident_requester" model="ir.rule">
+        <field name="name">Incidencias: solicitudes propias</field>
+        <field name="model_id" ref="model_ferreteria_transfer_incident"/>
+        <field name="domain_force">[('request_id.requester_id', '=', user.id)]</field>
+        <field name="groups" eval="[(4, ref('group_transfer_requester'))]"/>
+    </record>
+
+    <record id="rule_transfer_incident_approver" model="ir.rule">
+        <field name="name">Incidencias: sucursales donde puede aprobar</field>
+        <field name="model_id" ref="model_ferreteria_transfer_incident"/>
+        <field name="domain_force">[('request_id.supplying_warehouse_id', 'in', user.ferreteria_approve_warehouse_ids.ids)]</field>
+        <field name="groups" eval="[(4, ref('group_transfer_approver'))]"/>
+    </record>
+
+    <record id="rule_transfer_incident_dispatcher" model="ir.rule">
+        <field name="name">Incidencias: sucursales donde puede despachar</field>
+        <field name="model_id" ref="model_ferreteria_transfer_incident"/>
+        <field name="domain_force">[('request_id.supplying_warehouse_id', 'in', user.ferreteria_dispatch_warehouse_ids.ids)]</field>
+        <field name="groups" eval="[(4, ref('group_transfer_dispatcher'))]"/>
+    </record>
+
+    <record id="rule_transfer_incident_receiver" model="ir.rule">
+        <field name="name">Incidencias: sucursales donde puede recibir</field>
+        <field name="model_id" ref="model_ferreteria_transfer_incident"/>
+        <field name="domain_force">[('request_id.requesting_warehouse_id', 'in', user.ferreteria_receive_warehouse_ids.ids)]</field>
+        <field name="groups" eval="[(4, ref('group_transfer_receiver'))]"/>
+    </record>
+
+    <record id="rule_transfer_incident_admin" model="ir.rule">
+        <field name="name">Incidencias: administrador ve todas</field>
+        <field name="model_id" ref="model_ferreteria_transfer_incident"/>
+        <field name="domain_force">[(1, '=', 1)]</field>
+        <field name="groups" eval="[(4, ref('group_transfer_request_admin'))]"/>
+    </record>
+</odoo>

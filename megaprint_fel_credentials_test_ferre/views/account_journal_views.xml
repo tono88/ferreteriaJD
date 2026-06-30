@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_account_journal_form_megaprint_credentials_test" model="ir.ui.view">
+        <field name="name">account.journal.form.megaprint.credentials.test</field>
+        <field name="model">account.journal</field>
+        <field name="inherit_id" ref="fel_megaprint_ferre.journal_form_fel_megaprint"/>
+        <field name="arch" type="xml">
+            <field name="clave_fel" position="after">
+                <button
+                    name="action_test_megaprint_credentials"
+                    string="Probar credenciales FEL"
+                    type="object"
+                    class="btn-secondary"
+                    icon="fa-plug"
+                    groups="account.group_account_manager"
+                    help="Solicita únicamente un token en ambiente QA. No crea facturas, no contabiliza y no afecta inventario ni POS."
+                />
+            </field>
+        </field>
+    </record>
+</odoo>

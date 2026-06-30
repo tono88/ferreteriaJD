@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <menuitem id="menu_vlf_dashboard_root" name="Tecnodyne Dashboards" sequence="42" web_icon="vlf_dashboard_pro,static/description/icon.png" groups="vlf_dashboard_pro_ferre.group_vlf_dashboard_user"/>
+    <menuitem id="menu_vlf_dashboard_client" name="Ver Dashboards" parent="menu_vlf_dashboard_root" action="action_vlf_dashboard_client" sequence="1" groups="vlf_dashboard_pro_ferre.group_vlf_dashboard_user"/>
+    <menuitem id="menu_vlf_dashboard_config_root" name="Configuración" parent="menu_vlf_dashboard_root" sequence="90" groups="vlf_dashboard_pro_ferre.group_vlf_dashboard_manager"/>
+    <menuitem id="menu_vlf_dashboard_config" name="Dashboards" parent="menu_vlf_dashboard_config_root" action="action_vlf_dashboard" sequence="1" groups="vlf_dashboard_pro_ferre.group_vlf_dashboard_manager"/>
+    <menuitem id="menu_vlf_dashboard_items" name="Items" parent="menu_vlf_dashboard_config_root" action="action_vlf_dashboard_item" sequence="2" groups="vlf_dashboard_pro_ferre.group_vlf_dashboard_manager"/>
+    <menuitem id="menu_vlf_dashboard_dataset" name="Datasets Excel/CSV" parent="menu_vlf_dashboard_config_root" action="action_vlf_dashboard_dataset" sequence="3" groups="vlf_dashboard_pro_ferre.group_vlf_dashboard_manager"/>
+    <menuitem id="menu_vlf_dashboard_filters" name="Filtros personalizados" parent="menu_vlf_dashboard_config_root" action="action_vlf_dashboard_filter" sequence="4" groups="vlf_dashboard_pro_ferre.group_vlf_dashboard_manager"/>
+    <menuitem id="menu_vlf_dashboard_todo" name="To-do" parent="menu_vlf_dashboard_config_root" action="action_vlf_dashboard_todo" sequence="5" groups="vlf_dashboard_pro_ferre.group_vlf_dashboard_manager"/>
+</odoo>

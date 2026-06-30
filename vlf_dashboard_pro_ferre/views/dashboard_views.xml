@@ -1,0 +1,207 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_vlf_dashboard_list" model="ir.ui.view">
+        <field name="name">vlf.dashboard.list</field>
+        <field name="model">vlf.dashboard</field>
+        <field name="arch" type="xml">
+            <list string="Dashboards">
+                <field name="sequence" widget="handle"/>
+                <field name="name"/>
+                <field name="theme"/>
+                <field name="layout_mode"/>
+                <field name="item_count"/>
+                <field name="auto_refresh"/>
+                <field name="enable_realtime"/>
+                <field name="is_predefined"/>
+                <field name="active"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_vlf_dashboard_form" model="ir.ui.view">
+        <field name="name">vlf.dashboard.form</field>
+        <field name="model">vlf.dashboard</field>
+        <field name="arch" type="xml">
+            <form string="Dashboard">
+                <header>
+                    <button name="action_open_client" type="object" string="Abrir dashboard" class="btn-primary"/>
+                </header>
+                <sheet>
+                    <div class="oe_title">
+                        <h1><field name="name" placeholder="Nombre del dashboard"/></h1>
+                    </div>
+                    <group>
+                        <group>
+                            <field name="code" readonly="1"/>
+                            <field name="sequence"/>
+                            <field name="active"/>
+                            <field name="is_predefined" readonly="1"/>
+                            <field name="owner_id"/>
+                        </group>
+                        <group>
+                            <field name="layout_mode"/>
+                            <field name="theme"/>
+                            <field name="color_palette"/>
+                            <field name="auto_refresh"/>
+                            <field name="auto_refresh_seconds" invisible="not auto_refresh"/>
+                            <field name="enable_realtime"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="Items">
+                            <field name="item_ids" context="{'default_dashboard_id': id}">
+                                <list editable="bottom">
+                                    <field name="sequence" widget="handle"/>
+                                    <field name="name"/>
+                                    <field name="item_type"/>
+                                    <field name="data_source"/>
+                                    <field name="model_id"/>
+                                    <field name="dataset_id"/>
+                                    <field name="aggregation"/>
+                                    <field name="groupby_field_id"/>
+                                    <field name="measure_field_id"/>
+                                    <field name="active"/>
+                                </list>
+                            </field>
+                        </page>
+                        <page string="Filtros personalizados">
+                            <field name="filter_ids" context="{'default_dashboard_id': id}">
+                                <list editable="bottom">
+                                    <field name="sequence" widget="handle"/>
+                                    <field name="active"/>
+                                    <field name="name"/>
+                                    <field name="key"/>
+                                    <field name="field_name"/>
+                                    <field name="alternate_field_names"/>
+                                    <field name="value_type"/>
+                                    <field name="operator"/>
+                                    <field name="default_value"/>
+                                    <field name="placeholder"/>
+                                    <field name="option_values"/>
+                                    <field name="help_text"/>
+                                </list>
+                            </field>
+                            <div class="alert alert-info" role="alert">
+                                Ejemplos: campo principal partner_id para cliente y campos alternos order_id.partner_id / move_id.partner_id para líneas. También puedes usar product_id, user_id, state, payment_state, move_type, location_id o product_id.categ_id. Los filtros sugeridos se pueden agregar directo desde el dashboard.
+                            </div>
+                        </page>
+                        <page string="To-do">
+                            <field name="todo_ids" context="{'default_dashboard_id': id}">
+                                <list editable="bottom">
+                                    <field name="name"/>
+                                    <field name="state"/>
+                                    <field name="priority"/>
+                                    <field name="deadline"/>
+                                    <field name="user_id"/>
+                                </list>
+                            </field>
+                        </page>
+                        <page string="Seguridad y compañías">
+                            <group>
+                                <field name="company_ids" widget="many2many_tags"/>
+                                <field name="group_ids" widget="many2many_tags"/>
+                            </group>
+                        </page>
+                        <page string="Opciones">
+                            <group>
+                                <field name="enable_advanced_filters"/>
+                                <field name="allow_export"/>
+                                <field name="allow_import"/>
+                                <field name="allow_instant_edit"/>
+                                <field name="description"/>
+                            </group>
+                        </page>
+                    </notebook>
+                </sheet>
+                <chatter/>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_vlf_dashboard_search" model="ir.ui.view">
+        <field name="name">vlf.dashboard.search</field>
+        <field name="model">vlf.dashboard</field>
+        <field name="arch" type="xml">
+            <search string="Dashboards">
+                <field name="name"/>
+                <filter name="active" string="Activos" domain="[('active','=',True)]"/>
+                <filter name="predefined" string="Predefinidos" domain="[('is_predefined','=',True)]"/>
+                <group expand="0" string="Agrupar por">
+                    <filter name="group_theme" string="Tema" context="{'group_by': 'theme'}"/>
+                    <filter name="group_layout" string="Layout" context="{'group_by': 'layout_mode'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="view_vlf_dashboard_filter_list" model="ir.ui.view">
+        <field name="name">vlf.dashboard.filter.list</field>
+        <field name="model">vlf.dashboard.filter</field>
+        <field name="arch" type="xml">
+            <list string="Filtros personalizados">
+                <field name="sequence" widget="handle"/>
+                <field name="dashboard_id"/>
+                <field name="active"/>
+                <field name="name"/>
+                <field name="key"/>
+                <field name="field_name"/>
+                <field name="alternate_field_names"/>
+                <field name="value_type"/>
+                <field name="operator"/>
+                <field name="default_value"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_vlf_dashboard_filter_form" model="ir.ui.view">
+        <field name="name">vlf.dashboard.filter.form</field>
+        <field name="model">vlf.dashboard.filter</field>
+        <field name="arch" type="xml">
+            <form string="Filtro personalizado">
+                <sheet>
+                    <group>
+                        <group>
+                            <field name="dashboard_id"/>
+                            <field name="active"/>
+                            <field name="sequence"/>
+                            <field name="name"/>
+                            <field name="key"/>
+                        </group>
+                        <group>
+                            <field name="field_name"/>
+                            <field name="alternate_field_names" placeholder="order_id.partner_id&#10;move_id.partner_id"/>
+                            <field name="value_type"/>
+                            <field name="operator"/>
+                            <field name="placeholder"/>
+                            <field name="default_value"/>
+                        </group>
+                    </group>
+                    <group string="Opciones manuales">
+                        <field name="option_values" placeholder="sale:Venta confirmada&#10;draft:Cotización&#10;done:Bloqueado"/>
+                    </group>
+                    <group>
+                        <field name="help_text"/>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_vlf_dashboard_filter" model="ir.actions.act_window">
+        <field name="name">Filtros personalizados</field>
+        <field name="res_model">vlf.dashboard.filter</field>
+        <field name="view_mode">list,form</field>
+    </record>
+
+    <record id="action_vlf_dashboard" model="ir.actions.act_window">
+        <field name="name">Configurar Dashboards</field>
+        <field name="res_model">vlf.dashboard</field>
+        <field name="view_mode">list,form</field>
+        <field name="context">{'search_default_active': 1}</field>
+    </record>
+
+    <record id="action_vlf_dashboard_client" model="ir.actions.client">
+        <field name="name">Dashboards</field>
+        <field name="tag">vlf_dashboard_pro_ferre.client_action</field>
+    </record>
+</odoo>

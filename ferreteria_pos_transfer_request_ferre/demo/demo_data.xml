@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo noupdate="1">
+    <record id="demo_warehouse_requesting" model="stock.warehouse">
+        <field name="name">Demo Sucursal Solicitante</field>
+        <field name="code">DSS</field>
+        <field name="company_id" ref="base.main_company"/>
+    </record>
+    <record id="demo_warehouse_supplying" model="stock.warehouse">
+        <field name="name">Demo Sucursal Suministradora</field>
+        <field name="code">DSP</field>
+        <field name="company_id" ref="base.main_company"/>
+    </record>
+    <record id="demo_product_transfer" model="product.product">
+        <field name="name">Producto demo para traslado</field>
+        <field name="is_storable">True</field>
+        <field name="sale_ok">True</field>
+        <field name="purchase_ok">True</field>
+    </record>
+</odoo>

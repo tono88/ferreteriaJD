@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates id="template" xml:space="preserve">
+    <t t-name="ferreteria_pos_transfer_request_ferre.ControlButtons"
+       t-inherit="point_of_sale.ControlButtons"
+       t-inherit-mode="extension">
+        <xpath expr="//div[contains(@class, 'control-buttons-modal')]" position="inside">
+            <button class="btn btn-secondary btn-lg py-5 o_ferreteria_transfer_request_menu"
+                    t-on-click="openInterbranchRequests">
+                <i class="fa fa-exchange me-2" role="img" aria-label="Solicitudes a otras sucursales"/>
+                Solicitudes a otras sucursales
+            </button>
+        </xpath>
+    </t>
+</templates>

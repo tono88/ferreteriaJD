@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_vlf_dashboard_dataset_list" model="ir.ui.view">
+        <field name="name">vlf.dashboard.dataset.list</field>
+        <field name="model">vlf.dashboard.dataset</field>
+        <field name="arch" type="xml">
+            <list string="Datasets">
+                <field name="name"/>
+                <field name="source_type"/>
+                <field name="filename"/>
+                <field name="row_count"/>
+                <field name="parsed_at"/>
+                <field name="company_id"/>
+                <field name="active"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_vlf_dashboard_dataset_form" model="ir.ui.view">
+        <field name="name">vlf.dashboard.dataset.form</field>
+        <field name="model">vlf.dashboard.dataset</field>
+        <field name="arch" type="xml">
+            <form string="Dataset">
+                <header>
+                    <button name="action_parse_file" type="object" string="Procesar archivo" class="btn-primary"/>
+                </header>
+                <sheet>
+                    <div class="oe_title">
+                        <h1><field name="name"/></h1>
+                    </div>
+                    <group>
+                        <group>
+                            <field name="active"/>
+                            <field name="source_type"/>
+                            <field name="filename"/>
+                            <field name="file_data" filename="filename"/>
+                        </group>
+                        <group>
+                            <field name="row_count" readonly="1"/>
+                            <field name="parsed_at" readonly="1"/>
+                            <field name="company_id"/>
+                            <field name="headers_json" readonly="1"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="Filas procesadas">
+                            <field name="line_ids" readonly="1">
+                                <list>
+                                    <field name="row_index"/>
+                                    <field name="values_json"/>
+                                </list>
+                            </field>
+                        </page>
+                    </notebook>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_vlf_dashboard_dataset" model="ir.actions.act_window">
+        <field name="name">Datasets Excel/CSV</field>
+        <field name="res_model">vlf.dashboard.dataset</field>
+        <field name="view_mode">list,form</field>
+    </record>
+</odoo>

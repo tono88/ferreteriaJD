@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+    <t t-name="vlf_dashboard_reports_ferre.DashboardClientAction"
+       t-inherit="vlf_dashboard_pro_ferre.DashboardClientAction"
+       t-inherit-mode="extension">
+        <xpath expr="//input[@t-on-change='onCompanyChange']/.." position="replace"/>
+    </t>
+</templates>

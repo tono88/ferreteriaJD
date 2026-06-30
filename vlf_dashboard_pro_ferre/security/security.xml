@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="module_category_vlf_dashboard" model="ir.module.category">
+        <field name="name">Tecnodyne Dashboard</field>
+        <field name="sequence">35</field>
+    </record>
+
+    <record id="group_vlf_dashboard_user" model="res.groups">
+        <field name="name">Usuario Dashboard</field>
+        <field name="category_id" ref="module_category_vlf_dashboard"/>
+    </record>
+
+    <record id="group_vlf_dashboard_manager" model="res.groups">
+        <field name="name">Administrador Dashboard</field>
+        <field name="category_id" ref="module_category_vlf_dashboard"/>
+        <field name="implied_ids" eval="[(4, ref('vlf_dashboard_pro_ferre.group_vlf_dashboard_user'))]"/>
+    </record>
+
+    <record id="base.group_user" model="res.groups">
+        <field name="implied_ids" eval="[(4, ref('vlf_dashboard_pro_ferre.group_vlf_dashboard_user'))]"/>
+    </record>
+
+    <record id="base.group_system" model="res.groups">
+        <field name="implied_ids" eval="[(4, ref('vlf_dashboard_pro_ferre.group_vlf_dashboard_manager'))]"/>
+    </record>
+
+    <record id="ir_sequence_vlf_dashboard" model="ir.sequence">
+        <field name="name">Tecnodyne Dashboard</field>
+        <field name="code">vlf.dashboard</field>
+        <field name="prefix">DASH-</field>
+        <field name="padding">5</field>
+    </record>
+</odoo>

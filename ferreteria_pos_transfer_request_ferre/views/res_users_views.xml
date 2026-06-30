@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_users_form_transfer_warehouses" model="ir.ui.view">
+        <field name="name">res.users.form.transfer.permissions</field>
+        <field name="model">res.users</field>
+        <field name="inherit_id" ref="base.view_users_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//notebook" position="inside">
+                <page string="Solicitudes entre sucursales" groups="base.group_system">
+                    <div class="alert alert-info" role="alert">
+                        Agregue una línea, seleccione una o varias sucursales y uno o varios puntos de venta, y marque las acciones permitidas. Los grupos técnicos se sincronizan automáticamente.
+                    </div>
+                    <field name="ferreteria_transfer_permission_ids" context="{'default_user_id': id}">
+                        <list editable="bottom">
+                            <field name="active" column_invisible="True"/>
+                            <field name="warehouse_ids"
+                                   widget="many2many_tags"
+                                   options="{'no_create': True, 'no_quick_create': True, 'no_create_edit': True}"/>
+                            <field name="pos_config_ids"
+                                   widget="many2many_tags"
+                                   options="{'no_create': True, 'no_quick_create': True, 'no_create_edit': True}"/>
+                            <field name="can_request"/>
+                            <field name="can_approve"/>
+                            <field name="can_dispatch"/>
+                            <field name="can_receive"/>
+                        </list>
+                    </field>
+                    <group string="Resumen calculado" col="2">
+                        <field name="ferreteria_request_pos_ids" widget="many2many_tags" readonly="1"/>
+                        <field name="ferreteria_request_warehouse_ids" widget="many2many_tags" readonly="1"/>
+                        <field name="ferreteria_approve_warehouse_ids" widget="many2many_tags" readonly="1"/>
+                        <field name="ferreteria_dispatch_warehouse_ids" widget="many2many_tags" readonly="1"/>
+                        <field name="ferreteria_receive_warehouse_ids" widget="many2many_tags" readonly="1"/>
+                    </group>
+                </page>
+            </xpath>
+        </field>
+    </record>
+</odoo>

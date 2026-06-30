@@ -1,0 +1,2 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_megaprint_fel_credentials_test_result_manager,megaprint.fel.credentials.test.result manager,model_megaprint_fel_credentials_test_result,account.group_account_manager,1,1,1,1

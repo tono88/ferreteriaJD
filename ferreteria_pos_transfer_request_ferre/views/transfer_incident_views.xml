@@ -1,0 +1,93 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_transfer_incident_list" model="ir.ui.view">
+        <field name="name">ferreteria.transfer.incident.list</field>
+        <field name="model">ferreteria.transfer.incident</field>
+        <field name="arch" type="xml">
+            <list string="Incidencias" default_order="reported_at desc">
+                <field name="name"/>
+                <field name="request_id"/>
+                <field name="product_id"/>
+                <field name="incident_type"/>
+                <field name="incident_qty"/>
+                <field name="product_uom_id"/>
+                <field name="reported_by_id"/>
+                <field name="reported_at"/>
+                <field name="state" widget="badge"
+                       decoration-danger="state == 'open'"
+                       decoration-success="state == 'resolved'"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_transfer_incident_form" model="ir.ui.view">
+        <field name="name">ferreteria.transfer.incident.form</field>
+        <field name="model">ferreteria.transfer.incident</field>
+        <field name="arch" type="xml">
+            <form string="Incidencia">
+                <header>
+                    <button name="action_resolve" type="object" string="Resolver"
+                            class="btn-primary" invisible="state != 'open'"
+                            groups="ferreteria_pos_transfer_request_ferre.group_transfer_approver,ferreteria_pos_transfer_request_ferre.group_transfer_dispatcher,ferreteria_pos_transfer_request_ferre.group_transfer_receiver,ferreteria_pos_transfer_request_ferre.group_transfer_request_admin"/>
+                    <field name="state" widget="statusbar" statusbar_visible="open,resolved"/>
+                </header>
+                <sheet>
+                    <div class="oe_title">
+                        <h1><field name="name" readonly="1"/></h1>
+                    </div>
+                    <group>
+                        <group>
+                            <field name="request_id" readonly="state == 'resolved'" options="{'no_create': True}"/>
+                            <field name="line_id" readonly="state == 'resolved'" options="{'no_create': True}"/>
+                            <field name="product_id" readonly="1"/>
+                            <field name="product_uom_id" readonly="1"/>
+                            <field name="incident_type" readonly="state == 'resolved'"/>
+                        </group>
+                        <group>
+                            <field name="dispatched_qty" readonly="1"/>
+                            <field name="received_qty" readonly="1"/>
+                            <field name="incident_qty" readonly="state == 'resolved'"/>
+                            <field name="reported_by_id" readonly="1"/>
+                            <field name="reported_at" readonly="1"/>
+                        </group>
+                    </group>
+                    <group>
+                        <field name="note" readonly="state == 'resolved'"/>
+                        <field name="resolution_note"/>
+                    </group>
+                    <group invisible="state != 'resolved'">
+                        <field name="resolved_by_id" readonly="1"/>
+                        <field name="resolved_at" readonly="1"/>
+                    </group>
+                </sheet>
+                <chatter/>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_transfer_incident_search" model="ir.ui.view">
+        <field name="name">ferreteria.transfer.incident.search</field>
+        <field name="model">ferreteria.transfer.incident</field>
+        <field name="arch" type="xml">
+            <search string="Buscar incidencias">
+                <field name="name"/>
+                <field name="request_id"/>
+                <field name="product_id"/>
+                <filter string="Abiertas" name="open" domain="[('state', '=', 'open')]"/>
+                <filter string="Resueltas" name="resolved" domain="[('state', '=', 'resolved')]"/>
+                <group expand="0" string="Agrupar por">
+                    <filter string="Solicitud" name="group_request" context="{'group_by': 'request_id'}"/>
+                    <filter string="Tipo" name="group_type" context="{'group_by': 'incident_type'}"/>
+                    <filter string="Estado" name="group_state" context="{'group_by': 'state'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_transfer_incident" model="ir.actions.act_window">
+        <field name="name">Incidencias</field>
+        <field name="res_model">ferreteria.transfer.incident</field>
+        <field name="view_mode">list,form</field>
+        <field name="search_view_id" ref="view_transfer_incident_search"/>
+    </record>
+</odoo>

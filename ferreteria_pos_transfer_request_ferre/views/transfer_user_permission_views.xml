@@ -1,0 +1,92 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_transfer_user_permission_list" model="ir.ui.view">
+        <field name="name">ferreteria.transfer.user.permission.list</field>
+        <field name="model">ferreteria.transfer.user.permission</field>
+        <field name="arch" type="xml">
+            <list string="Permisos por usuario" editable="bottom" default_order="user_id, id">
+                <field name="active" column_invisible="True"/>
+                <field name="user_id" options="{'no_create': True, 'no_create_edit': True}"/>
+                <field name="warehouse_ids"
+                       widget="many2many_tags"
+                       options="{'no_create': True, 'no_quick_create': True, 'no_create_edit': True}"/>
+                <field name="pos_config_ids"
+                       widget="many2many_tags"
+                       options="{'no_create': True, 'no_quick_create': True, 'no_create_edit': True}"/>
+                <field name="can_request"/>
+                <field name="can_approve"/>
+                <field name="can_dispatch"/>
+                <field name="can_receive"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_transfer_user_permission_form" model="ir.ui.view">
+        <field name="name">ferreteria.transfer.user.permission.form</field>
+        <field name="model">ferreteria.transfer.user.permission</field>
+        <field name="arch" type="xml">
+            <form string="Permisos por usuario">
+                <sheet>
+                    <group>
+                        <group string="Usuario y alcance">
+                            <field name="active" invisible="1"/>
+                            <field name="user_id" options="{'no_create': True, 'no_create_edit': True}"/>
+                            <field name="warehouse_ids"
+                                   widget="many2many_tags"
+                                   options="{'no_create': True, 'no_quick_create': True, 'no_create_edit': True}"/>
+                            <field name="pos_config_ids"
+                                   widget="many2many_tags"
+                                   options="{'no_create': True, 'no_quick_create': True, 'no_create_edit': True}"/>
+                            <field name="company_id" invisible="1"/>
+                            <field name="warehouse_id" invisible="1"/>
+                            <field name="pos_config_id" invisible="1"/>
+                        </group>
+                        <group string="Permisos operativos">
+                            <field name="can_request"/>
+                            <field name="can_approve"/>
+                            <field name="can_dispatch"/>
+                            <field name="can_receive"/>
+                        </group>
+                    </group>
+                    <div class="alert alert-info" role="alert">
+                        <strong>Alcance:</strong>
+                        Puede seleccionar varias sucursales y varios puntos de venta. El almacén de cada POS se obtiene de su <strong>Tipo de operación</strong> y no se agrega como etiqueta visible. Para <strong>Solicitar</strong>, si elige POS específicos solo se autorizarán esos POS; si deja la lista de POS vacía, el permiso aplica a todos los POS de las sucursales seleccionadas. Aprobar, despachar y recibir se validan contra las sucursales seleccionadas y contra los almacenes derivados de los POS.
+                    </div>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_transfer_user_permission_search" model="ir.ui.view">
+        <field name="name">ferreteria.transfer.user.permission.search</field>
+        <field name="model">ferreteria.transfer.user.permission</field>
+        <field name="arch" type="xml">
+            <search string="Buscar permisos">
+                <field name="user_id"/>
+                <field name="warehouse_ids"/>
+                <field name="pos_config_ids"/>
+                <filter string="Puede solicitar" name="can_request" domain="[('can_request', '=', True)]"/>
+                <filter string="Puede aprobar" name="can_approve" domain="[('can_approve', '=', True)]"/>
+                <filter string="Puede despachar" name="can_dispatch" domain="[('can_dispatch', '=', True)]"/>
+                <filter string="Puede recibir" name="can_receive" domain="[('can_receive', '=', True)]"/>
+                <separator/>
+                <filter string="Archivados" name="inactive" domain="[('active', '=', False)]"/>
+                <group expand="0" string="Agrupar por">
+                    <filter string="Usuario" name="group_user" context="{'group_by': 'user_id'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_transfer_user_permission" model="ir.actions.act_window">
+        <field name="name">Permisos por usuario y sucursal</field>
+        <field name="res_model">ferreteria.transfer.user.permission</field>
+        <field name="view_mode">list,form</field>
+        <field name="search_view_id" ref="view_transfer_user_permission_search"/>
+        <field name="context">{'search_default_group_user': 1}</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">Configure qué puede hacer cada usuario en una o varias sucursales.</p>
+            <p>Los grupos técnicos se asignan automáticamente según esta matriz.</p>
+        </field>
+    </record>
+</odoo>

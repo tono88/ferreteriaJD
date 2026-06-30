@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+
+    <t t-name="partner_internal_code._loaded" owl="1">
+        <t t-set="dummy" t-value="0"/>
+    </t>
+
+    <t t-name="partner_internal_code.PartnerListHeader"
+       t-inherit="point_of_sale.PartnerList"
+       t-inherit-mode="extension"
+       owl="1">
+        <xpath expr="//thead/tr/th[1]" position="after">
+            <th class="o_pos_col_internal_code" style="text-align: center;">
+                Código<br/>interno
+            </th>
+        </xpath>
+    </t>
+
+    <t t-name="partner_internal_code.PartnerLineInternalCode"
+       t-inherit="point_of_sale.PartnerLine"
+       t-inherit-mode="extension"
+       owl="1">
+        <xpath expr="//tr/td[1]" position="after">
+            <td class="o_pos_col_internal_code"
+                style="white-space: nowrap; text-align: center;">
+                <t t-esc="props.partner.internal_code or ''"/>
+            </td>
+        </xpath>
+    </t>
+
+</templates>

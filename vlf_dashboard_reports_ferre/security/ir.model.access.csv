@@ -1,0 +1,3 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_vlf_sales_order_fact_user,vlf.sales.order.fact user,model_vlf_sales_order_fact,vlf_dashboard_pro_ferre.group_vlf_dashboard_user,1,0,0,0
+access_vlf_dashboard_update_presets_manager,vlf.dashboard.update.presets manager,model_vlf_dashboard_update_presets_wizard,vlf_dashboard_pro_ferre.group_vlf_dashboard_manager,1,1,1,1

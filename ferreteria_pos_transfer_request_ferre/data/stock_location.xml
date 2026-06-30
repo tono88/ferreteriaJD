@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo noupdate="1">
+    <record id="location_interbranch_transit" model="stock.location">
+        <field name="name">Tránsito entre sucursales</field>
+        <field name="usage">transit</field>
+        <field name="location_id" ref="stock.stock_location_locations_virtual"/>
+        <field name="company_id" eval="False"/>
+        <field name="active">True</field>
+    </record>
+</odoo>
