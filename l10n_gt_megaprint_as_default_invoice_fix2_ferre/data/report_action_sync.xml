@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<odoo>
+  <function model="ir.actions.report" name="_sync_megaprint_default_invoice_report_ferre"/>
+</odoo>

@@ -1,12 +1,1 @@
-# -*- coding: utf-8 -*-
-{
-    "name": "Invoice Report Brand Exact",
-    "version": "18.0.1.0.0",
-    "summary": "Precisely replace the hardcoded brand div in Megaprint invoice header.",
-    "author": "ChatGPT",
-    "license": "LGPL-3",
-    "depends": ["account", "l10n_gt_fel_megaprint_report_ferre"],
-    "data": ["views/report_invoice_brand_exact.xml"],
-    "installable": True,
-    "application": False
-}
+{'name': 'Invoice Report Brand Exact', 'version': '18.0.1.1.0', 'summary': 'Alinea el nombre comercial del reporte FEL con la configuración del diario.', 'author': 'ChatGPT', 'license': 'LGPL-3', 'depends': ['account', 'l10n_gt_fel_megaprint_report_ferre'], 'data': ['views/report_invoice_brand_exact.xml'], 'installable': True, 'application': False}

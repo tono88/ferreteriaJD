@@ -1,13 +1,11 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <odoo>
   <template id="report_invoice_brand_exact_inherit"
-            name="Invoice: Brand Exact Replace"
+            name="Invoice: Dynamic Commercial Name"
             inherit_id="l10n_gt_fel_megaprint_report_ferre.report_fel_invoice">
-    <xpath expr="//div[@style='text-transform:uppercase;'][contains(normalize-space(.), 'BLOCKERA BUSTAMANTE')]" position="replace">
-      <div style="text-transform:uppercase;">
-        <t t-set="rec" t-value="docs and docs[0] or False"/>
-        <t t-if="rec and 'journal_id' in rec._fields and rec.journal_id and 'codigo_establecimiento' in rec.journal_id._fields and (rec.journal_id.codigo_establecimiento == 2 or rec.journal_id.codigo_establecimiento == '2')">BUSTAMIX</t>
-        <t t-else="">BLOCKERA BUSTAMANTE</t>
+    <xpath expr="//div[contains(concat(' ', normalize-space(@class), ' '), ' fel-commercial-name ')]" position="replace">
+      <div class="fel-commercial-name" style="text-transform:uppercase;">
+        <span t-esc="(o.journal_id and o.journal_id.direccion and o.journal_id.direccion.name) or o.company_id.name or ''"/>
       </div>
     </xpath>
   </template>

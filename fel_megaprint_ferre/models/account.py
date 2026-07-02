@@ -103,6 +103,145 @@ class AccountInvoice(models.Model):
             _logger.warning("[MEGAPRINT] _fel_apply_from_xml fallo: %s", e)
             return False
 
+
+    def _fel_safe_filename_base(self, factura):
+        value = factura.name or "factura_%s" % factura.id
+        value = value.replace("/", "_").replace("\\", "_")
+        return re.sub(r"[^A-Za-z0-9_.-]+", "_", value).strip("_.") or "factura_%s" % factura.id
+
+    def _fel_store_certified_xml(self, factura, xml_certificado_text):
+        """Replace the preliminary signed XML with the final certified DTE.
+
+        ``megaprint_fel_block_post_safe_ferre`` attaches ``documento_xml_fel``
+        to the chatter after certification. Storing the certified XML here
+        ensures that attachment is the final DTE containing
+        ``NumeroAutorizacion``, not merely the emitter-signed preliminary XML.
+        """
+        if not xml_certificado_text:
+            return False
+        if isinstance(xml_certificado_text, bytes):
+            xml_bytes = xml_certificado_text
+            xml_text = xml_certificado_text.decode("utf-8")
+        else:
+            xml_text = str(xml_certificado_text)
+            xml_bytes = xml_text.encode("utf-8")
+
+        # Validate before replacing the stored document.
+        na = self._fel_parse_na(xml_text)
+        if not na or not na.get("firma") or not na.get("serie") or not na.get("numero"):
+            raise UserError("El XML recuperado no contiene una autorización FEL completa.")
+
+        vals = {}
+        if "documento_xml_fel" in factura._fields:
+            vals["documento_xml_fel"] = base64.b64encode(xml_bytes)
+        if "documento_xml_fel_name" in factura._fields:
+            vals["documento_xml_fel_name"] = "%s_fel_cert.xml" % self._fel_safe_filename_base(factura)[:18]
+        if vals:
+            factura.write(vals)
+        _logger.info(
+            "[MEGAPRINT] XML certificado almacenado move_id=%s serie=%s numero=%s",
+            factura.id, na.get("serie"), na.get("numero"),
+        )
+        return True
+
+    def _fel_extract_response_error(self, root):
+        descriptions = []
+        for xpath in (
+            "//*[local-name()='desc_error']",
+            "//*[local-name()='descripcion_errores']",
+            "//*[local-name()='descripcion']",
+        ):
+            for node in root.xpath(xpath):
+                text = (node.text or "").strip()
+                if text and text not in descriptions:
+                    descriptions.append(text)
+        return "; ".join(descriptions) or "Respuesta FEL sin detalle de error."
+
+    def action_recover_megaprint_certified_xml(self):
+        """Recover and store an already certified XML without recertifying."""
+        for factura in self:
+            if not getattr(factura, "firma_fel", False):
+                raise UserError("La factura no tiene UUID de autorización FEL para recuperar.")
+            usuario = (getattr(factura.journal_id, "usuario_fel", False) or "").strip()
+            apikey = (getattr(factura.journal_id, "clave_fel", False) or "").strip()
+            if not usuario or not apikey:
+                raise UserError("El diario no tiene usuario y API key FEL configurados.")
+
+            base_url = "https://apiv2.ifacere-fel.com/api"
+            if getattr(factura.company_id, "pruebas_fel", False):
+                base_url = "https://dev2.api.ifacere-fel.com/api"
+
+            token_root = etree.Element("SolicitaTokenRequest")
+            etree.SubElement(token_root, "usuario").text = usuario
+            etree.SubElement(token_root, "apikey").text = apikey
+            try:
+                response = requests.post(
+                    base_url + "/solicitarToken",
+                    data=etree.tostring(token_root, encoding="UTF-8", xml_declaration=True),
+                    headers={"Content-Type": "application/xml"},
+                    timeout=(5, 30),
+                )
+                response.raise_for_status()
+                token_xml = etree.fromstring(response.content)
+            except (requests.RequestException, etree.XMLSyntaxError) as exc:
+                raise UserError("No se pudo solicitar el token FEL: %s" % exc)
+            token = (token_xml.findtext(".//token") or "").strip()
+            if not token:
+                raise UserError(self._fel_extract_response_error(token_xml))
+
+            request_root = etree.Element("RetornaXMLRequest")
+            etree.SubElement(request_root, "uuid").text = factura.firma_fel
+            try:
+                response = requests.post(
+                    base_url + "/retornarXML",
+                    data=etree.tostring(request_root, encoding="UTF-8", xml_declaration=True),
+                    headers={
+                        "Content-Type": "application/xml",
+                        "authorization": "Bearer " + token,
+                    },
+                    timeout=(5, 30),
+                )
+                response.raise_for_status()
+                result_xml = etree.fromstring(response.content)
+            except (requests.RequestException, etree.XMLSyntaxError) as exc:
+                raise UserError("No se pudo recuperar el XML certificado FEL: %s" % exc)
+
+            nodes = result_xml.xpath("//*[local-name()='xml_dte']")
+            if not nodes or not (nodes[0].text or "").strip():
+                raise UserError(self._fel_extract_response_error(result_xml))
+            xml_certificado = nodes[0].text
+            na = self._fel_parse_na(xml_certificado)
+            if not na or na.get("firma") != factura.firma_fel:
+                raise UserError("El XML recuperado no corresponde al UUID de esta factura.")
+
+            self._fel_store_certified_xml(factura, xml_certificado)
+            self._fel_apply_na(factura, na)
+            attachment_ids = []
+            if "documento_xml_fel" in factura._fields and factura.documento_xml_fel:
+                attachment = self.env["ir.attachment"].sudo().create({
+                    "name": getattr(factura, "documento_xml_fel_name", False) or "%s_fel_cert.xml" % self._fel_safe_filename_base(factura)[:18],
+                    "datas": factura.documento_xml_fel,
+                    "res_model": "account.move",
+                    "res_id": factura.id,
+                    "mimetype": "application/xml",
+                })
+                attachment_ids.append(attachment.id)
+            factura.message_post(
+                body="<b>XML certificado FEL recuperado y almacenado.</b>",
+                attachment_ids=attachment_ids,
+            )
+
+        return {
+            "type": "ir.actions.client",
+            "tag": "display_notification",
+            "params": {
+                "title": "FEL",
+                "message": "El XML certificado fue recuperado y almacenado sin recertificar la factura.",
+                "type": "success",
+                "sticky": False,
+            },
+        }
+
     # ---------------------------------------------------------------------
     # Flujo principal de certificación (idempotente por id)
     # ---------------------------------------------------------------------
@@ -150,6 +289,7 @@ class AccountInvoice(models.Model):
                 vxml = etree.XML(rv.text.encode('utf-8'))
                 vnode = vxml.xpath("//xml_dte")
                 if vnode:
+                    self._fel_store_certified_xml(factura, vnode[0].text)
                     if self._fel_apply_from_xml(factura, vnode[0].text):
                         # por si algún otro flujo ya fijó el name: SERIE-NUMERO
                         self._fel_sync_from_name_if_needed(factura)
@@ -232,6 +372,7 @@ class AccountInvoice(models.Model):
 
             # --- Aplicar resultado como hace infile ---
             if xml_certificado:
+                self._fel_store_certified_xml(factura, xml_certificado)
                 applied = self._fel_apply_from_xml(factura, xml_certificado)
                 # plan B: por si otro flujo ya armó el name SERIE-NUMERO
                 self._fel_sync_from_name_if_needed(factura)

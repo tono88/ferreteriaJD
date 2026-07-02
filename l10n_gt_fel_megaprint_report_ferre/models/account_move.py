@@ -1,7 +1,14 @@
 # -*- coding: utf-8 -*-
 from math import modf
+import base64
+import logging
+import re
+
+from lxml import etree
 
 from odoo import api, fields, models
+
+_logger = logging.getLogger(__name__)
 
 try:
     from num2words import num2words
@@ -38,6 +45,80 @@ class AccountMove(models.Model):
             move.amount_total_gt_words = (
                 f"{texto_entero} {moneda} CON {centavos:02d}/100"
             ).upper()
+
+
+    _FEL_PHRASE_LABELS = {
+        (1, 1): "Sujeto a pagos trimestrales ISR",
+        (2, 1): "Agente de Retención del IVA",
+    }
+
+    def _fel_phrase_pairs_from_xml(self):
+        """Read the phrase codes actually embedded in this invoice XML.
+
+        The invoice XML is preferred over the current company configuration so
+        historical reprints keep the phrases that were sent for certification.
+        This also works with the signed XML generated before registration.
+        """
+        self.ensure_one()
+        if "documento_xml_fel" not in self._fields or not self.documento_xml_fel:
+            return []
+
+        try:
+            payload = self.documento_xml_fel
+            if isinstance(payload, str):
+                payload = payload.encode("ascii")
+            xml_bytes = base64.b64decode(payload)
+            root = etree.fromstring(xml_bytes)
+        except Exception as exc:
+            _logger.debug("Could not parse FEL XML phrases for move %s: %s", self.id, exc)
+            return []
+
+        pairs = []
+        for node in root.xpath("//*[local-name()='Frase']"):
+            try:
+                tipo = int((node.get("TipoFrase") or "").strip())
+                escenario = int((node.get("CodigoEscenario") or "").strip())
+            except (TypeError, ValueError):
+                continue
+            pair = (tipo, escenario)
+            if pair not in pairs:
+                pairs.append(pair)
+        return pairs
+
+    def _fel_phrase_pairs_from_company(self):
+        """Parse safe ``frase(tipo=X, escenario=Y)`` entries without exec()."""
+        self.ensure_one()
+        company = self.company_id or self.env.company
+        if "frases_fel" not in company._fields:
+            return []
+        raw = company.frases_fel or ""
+        pairs = []
+        for call in re.findall(r"frase\s*\(([^)]*)\)", raw, flags=re.IGNORECASE):
+            values = {
+                key.lower(): int(value)
+                for key, value in re.findall(
+                    r"(tipo|escenario)\s*=\s*['\"]?(\d+)",
+                    call,
+                    flags=re.IGNORECASE,
+                )
+            }
+            if "tipo" not in values or "escenario" not in values:
+                continue
+            pair = (values["tipo"], values["escenario"])
+            if pair not in pairs:
+                pairs.append(pair)
+        return pairs
+
+    def get_fel_phrase_labels(self):
+        """Return only legal legends configured/sent for this invoice.
+
+        Unknown combinations are deliberately omitted instead of inventing a
+        fiscal legend. Add them to ``_FEL_PHRASE_LABELS`` only after validating
+        the official wording.
+        """
+        self.ensure_one()
+        pairs = self._fel_phrase_pairs_from_xml() or self._fel_phrase_pairs_from_company()
+        return [self._FEL_PHRASE_LABELS[pair] for pair in pairs if pair in self._FEL_PHRASE_LABELS]
 
     def _get_related_pos_order(self):
         """Return the POS order linked to this invoice, without custom fields.

@@ -87,7 +87,9 @@
                     <span t-esc="o.company_id.name or ''"/>
                   </div>
                   <div>NIT: <span t-esc="o.company_id.vat or ''"/></div>
-				  <div style="text-transform:uppercase;">BLOCKERA BUSTAMANTE</div>
+				  <div class="fel-commercial-name" style="text-transform:uppercase;">
+                    <span t-esc="(o.journal_id and o.journal_id.direccion and o.journal_id.direccion.name) or o.company_id.name or ''"/>
+                  </div>
                   <!-- SOLO DIRECCIÓN, sin repetir la empresa -->
 				<!--	<div 
 						 t-esc="(o.company_id.partner_id and o.company_id.partner_id._display_address(without_company=True)) or ''"/>
@@ -244,8 +246,11 @@
                   </td>
                 </tr>
               </table>
-              <div class="note" style="margin-top:6px;">Sujeto a pagos trimestrales ISR</div>
-              <div class="note" style="margin-top:6px;">Agente de Retención del IVA</div>
+              <t t-foreach="o.get_fel_phrase_labels()" t-as="fel_phrase_label">
+                <div class="note" style="margin-top:6px;">
+                  <span t-esc="fel_phrase_label"/>
+                </div>
+              </t>
             </div>
 
           </main>

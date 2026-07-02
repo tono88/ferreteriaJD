@@ -51,19 +51,9 @@ def _update_email_template(env, action):
 def post_init_set_megaprint_invoice(env_or_cr):
     env = _ensure_env(env_or_cr)
     try:
-        act = _find_invoice_action(env)
-        if not act:
-            _logger.error('No se pudo localizar ir.actions.report de factura para reemplazar.')
-            return
-        act.write({
-            'report_name': MEGAPRINT_QWEB,
-            'report_file': MEGAPRINT_QWEB,
-            'name': 'Factura (Megaprint)',
-        })
-        _logger.info('Acción de impresión de factura ahora usa: %s', MEGAPRINT_QWEB)
-        _update_email_template(env, act)
+        env["ir.actions.report"]._sync_megaprint_default_invoice_report_ferre()
     except Exception as e:
-        _logger.exception('Error configurando Megaprint como reporte por defecto: %s', e)
+        _logger.exception("Error configurando Megaprint como reporte por defecto: %s", e)
 
 def uninstall_restore_default_invoice(env_or_cr):
     env = _ensure_env(env_or_cr)
