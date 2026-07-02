@@ -1,0 +1,49 @@
+.pos-receipt {
+    .ferreteria-fel-header,
+    .ferreteria-fel-document-data,
+    .ferreteria-fel-certification {
+        font-size: 0.92em;
+        line-height: 1.25;
+    }
+
+    .ferreteria-fel-header {
+        text-align: center;
+        margin-bottom: 0.4rem;
+    }
+
+    .ferreteria-fel-logo {
+        display: block;
+        max-width: 150px;
+        max-height: 80px;
+        margin: 0 auto 0.25rem auto;
+        object-fit: contain;
+    }
+
+    .ferreteria-fel-separator {
+        text-align: center;
+        overflow: hidden;
+        white-space: nowrap;
+    }
+
+    .ferreteria-fel-pending {
+        font-weight: 700;
+        text-align: center;
+    }
+
+    .ferreteria-fel-break {
+        overflow-wrap: anywhere;
+        word-break: break-word;
+    }
+
+    .ferreteria-fel-qr {
+        display: block;
+        width: 145px;
+        height: 145px;
+        object-fit: contain;
+        margin: 0 auto;
+    }
+
+    .ferreteria-fel-preline {
+        white-space: pre-line;
+    }
+}

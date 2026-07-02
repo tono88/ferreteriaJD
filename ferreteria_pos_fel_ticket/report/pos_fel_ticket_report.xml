@@ -1,0 +1,172 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<odoo>
+    <record id="paperformat_pos_fel_ticket_80mm" model="report.paperformat">
+        <field name="name">Ticket FEL 80 mm</field>
+        <field name="default" eval="False"/>
+        <field name="format">custom</field>
+        <field name="page_width">80</field>
+        <field name="page_height">297</field>
+        <field name="orientation">Portrait</field>
+        <field name="margin_top">3</field>
+        <field name="margin_bottom">3</field>
+        <field name="margin_left">3</field>
+        <field name="margin_right">3</field>
+        <field name="header_line" eval="False"/>
+        <field name="header_spacing">0</field>
+        <field name="dpi">96</field>
+    </record>
+
+    <record id="action_report_pos_fel_ticket" model="ir.actions.report">
+        <field name="name">Ticket FEL térmico</field>
+        <field name="model">pos.order</field>
+        <field name="report_type">qweb-pdf</field>
+        <field name="report_name">ferreteria_pos_fel_ticket.report_pos_fel_ticket_document</field>
+        <field name="report_file">ferreteria_pos_fel_ticket.report_pos_fel_ticket_document</field>
+        <field name="binding_model_id" ref="point_of_sale.model_pos_order"/>
+        <field name="binding_type">report</field>
+        <field name="paperformat_id" ref="ferreteria_pos_fel_ticket.paperformat_pos_fel_ticket_80mm"/>
+        <field name="print_report_name">'Ticket FEL - %s' % (object.pos_reference or object.name)</field>
+    </record>
+
+    <template id="report_pos_fel_ticket_document">
+        <t t-call="web.html_container">
+            <t t-foreach="docs" t-as="o">
+                <t t-set="ticket" t-value="o._get_fel_ticket_data()"/>
+                <div class="page" style="font-family: Arial, sans-serif; font-size: 10px; line-height: 1.25; padding: 0; margin: 0;">
+                    <div style="text-align: center;">
+                        <img t-if="o.company_id.logo"
+                             t-att-src="image_data_uri(o.company_id.logo)"
+                             style="max-width: 42mm; max-height: 22mm; object-fit: contain;"/>
+                        <div style="font-weight: 700; font-size: 12px;" t-esc="ticket.get('commercial_name') or o.config_id.name"/>
+                        <div t-if="ticket.get('emitter_name') != ticket.get('commercial_name')"
+                             t-esc="ticket.get('emitter_name')"/>
+                        <div>NIT: <span t-esc="ticket.get('emitter_vat') or ''"/></div>
+                        <div t-if="ticket.get('emitter_address')" t-esc="ticket.get('emitter_address')"/>
+                        <div t-if="ticket.get('receipt_header')"
+                             style="white-space: pre-line; margin-top: 2mm;"
+                             t-esc="ticket.get('receipt_header')"/>
+                    </div>
+
+                    <t t-if="ticket.get('enabled')">
+                        <div style="text-align: center; margin-top: 2mm; font-weight: 700;">
+                            <div>DOCUMENTO TRIBUTARIO ELECTRÓNICO FEL</div>
+                            <div t-esc="ticket.get('document_type')"/>
+                        </div>
+
+                        <div style="margin-top: 2mm;">
+                            <t t-if="ticket.get('certified')">
+                                <div>Serie: <span t-esc="ticket.get('series') or ''"/></div>
+                                <div>Número: <span t-esc="ticket.get('number') or ''"/></div>
+                            </t>
+                            <div t-else="" style="font-weight: 700; text-align: center;">
+                                PENDIENTE DE CERTIFICACIÓN FEL
+                            </div>
+                            <div>Fecha: <span t-esc="ticket.get('issue_datetime') or ''"/></div>
+                            <div t-if="ticket.get('cashier')">Cajero: <span t-esc="ticket.get('cashier')"/></div>
+                            <div t-if="ticket.get('pos_name')">Punto de venta: <span t-esc="ticket.get('pos_name')"/></div>
+                        </div>
+
+                        <div style="border-top: 1px dashed #000; margin: 2mm 0;"></div>
+                        <div>
+                            <div>NIT cliente: <span t-esc="ticket.get('customer_vat') or 'CF'"/></div>
+                            <div>Cliente: <span t-esc="ticket.get('customer_name') or 'Consumidor Final'"/></div>
+                            <div t-if="ticket.get('customer_address')">
+                                Dirección: <span t-esc="ticket.get('customer_address')"/>
+                            </div>
+                        </div>
+                    </t>
+                    <t t-else="">
+                        <div style="text-align: center; font-weight: 700; margin-top: 2mm;">
+                            COMPROBANTE POS SIN FACTURA FEL
+                        </div>
+                    </t>
+
+                    <div style="border-top: 1px dashed #000; margin: 2mm 0;"></div>
+                    <table style="width: 100%; border-collapse: collapse; font-size: 9px;">
+                        <thead>
+                            <tr>
+                                <th style="text-align: left; width: 49%;">Producto</th>
+                                <th style="text-align: right; width: 13%;">Cant.</th>
+                                <th style="text-align: right; width: 18%;">P/U</th>
+                                <th style="text-align: right; width: 20%;">Total</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr t-foreach="ticket.get('lines', [])" t-as="line">
+                                <td style="vertical-align: top; padding: 1mm 0;">
+                                    <span t-esc="line.get('name')"/>
+                                    <div t-if="line.get('discount')" style="font-size: 8px;">
+                                        Desc.: <span t-esc="line.get('discount_display')"/>%
+                                    </div>
+                                    <div t-if="line.get('customer_note')" style="font-size: 8px;" t-esc="line.get('customer_note')"/>
+                                </td>
+                                <td style="text-align: right; vertical-align: top; padding: 1mm 0;" t-esc="line.get('quantity_display')"/>
+                                <td style="text-align: right; vertical-align: top; padding: 1mm 0;" t-esc="line.get('unit_price_formatted')"/>
+                                <td style="text-align: right; vertical-align: top; padding: 1mm 0;" t-esc="line.get('line_total_formatted')"/>
+                            </tr>
+                        </tbody>
+                    </table>
+
+                    <div style="border-top: 1px dashed #000; margin: 2mm 0;"></div>
+                    <table style="width: 100%; border-collapse: collapse;">
+                        <tr>
+                            <td>Subtotal:</td>
+                            <td style="text-align: right;" t-esc="ticket.get('amount_untaxed_formatted')"/>
+                        </tr>
+                        <tr>
+                            <td>Impuestos:</td>
+                            <td style="text-align: right;" t-esc="ticket.get('amount_tax_formatted')"/>
+                        </tr>
+                        <tr style="font-weight: 700; font-size: 12px;">
+                            <td>TOTAL:</td>
+                            <td style="text-align: right;" t-esc="ticket.get('amount_total_formatted')"/>
+                        </tr>
+                    </table>
+
+                    <div style="border-top: 1px dashed #000; margin: 2mm 0;"></div>
+                    <table style="width: 100%; border-collapse: collapse;">
+                        <tr t-foreach="ticket.get('payments', [])" t-as="payment">
+                            <td t-esc="payment.get('name')"/>
+                            <td style="text-align: right;" t-esc="payment.get('amount_formatted')"/>
+                        </tr>
+                        <tr t-if="ticket.get('amount_return')">
+                            <td>Cambio:</td>
+                            <td style="text-align: right;" t-esc="ticket.get('amount_return_formatted')"/>
+                        </tr>
+                    </table>
+
+                    <t t-if="ticket.get('enabled')">
+                        <div style="border-top: 1px dashed #000; margin: 2mm 0;"></div>
+                        <t t-if="ticket.get('certified')">
+                            <div style="overflow-wrap: anywhere; word-break: break-word;">
+                                Autorización: <span t-esc="ticket.get('authorization')"/>
+                            </div>
+                            <div t-if="ticket.get('certification_datetime')">
+                                Fecha certificación: <span t-esc="ticket.get('certification_datetime')"/>
+                            </div>
+                        </t>
+                        <div t-else="" style="font-weight: 700; text-align: center;" t-esc="ticket.get('message')"/>
+                        <div t-if="ticket.get('certifier_name')" style="margin-top: 1mm;">
+                            Certificador: <span t-esc="ticket.get('certifier_name')"/>
+                        </div>
+                        <div t-if="ticket.get('certifier_vat')">
+                            NIT certificador: <span t-esc="ticket.get('certifier_vat')"/>
+                        </div>
+                        <div t-if="ticket.get('qr_image_src')" style="text-align: center; margin-top: 2mm;">
+                            <img t-att-src="ticket.get('qr_image_src')"
+                                 style="width: 34mm; height: 34mm; object-fit: contain;"
+                                 alt="QR FEL"/>
+                        </div>
+                    </t>
+
+                    <div style="text-align: center; margin-top: 2mm;">
+                        <div t-if="ticket.get('receipt_footer')"
+                             style="white-space: pre-line;"
+                             t-esc="ticket.get('receipt_footer')"/>
+                        <div style="margin-top: 2mm;" t-esc="ticket.get('order_reference') or o.pos_reference or o.name"/>
+                    </div>
+                </div>
+            </t>
+        </t>
+    </template>
+</odoo>

@@ -1,0 +1,86 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates id="template" xml:space="preserve">
+    <t t-name="ferreteria_pos_fel_ticket.OrderReceipt"
+       t-inherit="point_of_sale.OrderReceipt"
+       t-inherit-mode="extension">
+
+        <xpath expr="//ReceiptHeader" position="replace">
+            <t t-if="props.data.fel_ticket and props.data.fel_ticket.enabled">
+                <div class="ferreteria-fel-header">
+                    <img t-if="props.data.fel_ticket.company_logo_url"
+                         t-att-src="props.data.fel_ticket.company_logo_url"
+                         class="ferreteria-fel-logo"
+                         alt="Logo"/>
+                    <div class="fw-bolder" t-esc="props.data.fel_ticket.commercial_name"/>
+                    <div t-if="props.data.fel_ticket.emitter_name != props.data.fel_ticket.commercial_name"
+                         t-esc="props.data.fel_ticket.emitter_name"/>
+                    <div>NIT: <t t-esc="props.data.fel_ticket.emitter_vat or ''"/></div>
+                    <div t-if="props.data.fel_ticket.emitter_address"
+                         t-esc="props.data.fel_ticket.emitter_address"/>
+                    <div t-if="props.data.fel_ticket.receipt_header"
+                         class="ferreteria-fel-preline mt-1"
+                         t-esc="props.data.fel_ticket.receipt_header"/>
+                </div>
+            </t>
+            <t t-else="">
+                <ReceiptHeader data="props.data.headerData"/>
+            </t>
+        </xpath>
+
+        <xpath expr="//OrderWidget" position="before">
+            <div t-if="props.data.fel_ticket and props.data.fel_ticket.enabled"
+                 class="ferreteria-fel-document-data">
+                <div class="text-center fw-bolder">Documento Tributario Electrónico FEL</div>
+                <div class="text-center fw-bolder" t-esc="props.data.fel_ticket.document_type"/>
+                <div t-if="props.data.fel_ticket.certified" class="mt-1">
+                    <div>Serie: <t t-esc="props.data.fel_ticket.series or ''"/></div>
+                    <div>Número: <t t-esc="props.data.fel_ticket.number or ''"/></div>
+                </div>
+                <div t-else="" class="ferreteria-fel-pending mt-1">
+                    PENDIENTE DE CERTIFICACIÓN FEL
+                </div>
+                <div class="mt-1">Fecha: <t t-esc="props.data.fel_ticket.issue_datetime or props.data.date"/></div>
+                <div t-if="props.data.fel_ticket.cashier">Cajero: <t t-esc="props.data.fel_ticket.cashier"/></div>
+                <div t-if="props.data.fel_ticket.pos_name">Punto de venta: <t t-esc="props.data.fel_ticket.pos_name"/></div>
+                <div class="ferreteria-fel-separator">--------------------------------</div>
+                <div>NIT cliente: <t t-esc="props.data.fel_ticket.customer_vat or 'CF'"/></div>
+                <div>Cliente: <t t-esc="props.data.fel_ticket.customer_name or 'Consumidor Final'"/></div>
+                <div t-if="props.data.fel_ticket.customer_address">
+                    Dirección: <t t-esc="props.data.fel_ticket.customer_address"/>
+                </div>
+                <div class="ferreteria-fel-separator">--------------------------------</div>
+            </div>
+        </xpath>
+
+        <xpath expr="//div[@class='before-footer']" position="replace">
+            <div class="before-footer"/>
+            <div t-if="props.data.fel_ticket and props.data.fel_ticket.enabled"
+                 class="ferreteria-fel-certification">
+                <div class="ferreteria-fel-separator">--------------------------------</div>
+                <t t-if="props.data.fel_ticket.certified">
+                    <div class="ferreteria-fel-break">
+                        Autorización: <t t-esc="props.data.fel_ticket.authorization"/>
+                    </div>
+                    <div t-if="props.data.fel_ticket.certification_datetime">
+                        Fecha certificación: <t t-esc="props.data.fel_ticket.certification_datetime"/>
+                    </div>
+                </t>
+                <div t-else="" t-esc="props.data.fel_ticket.message" class="ferreteria-fel-pending"/>
+                <div t-if="props.data.fel_ticket.certifier_name" class="mt-1">
+                    Certificador: <t t-esc="props.data.fel_ticket.certifier_name"/>
+                </div>
+                <div t-if="props.data.fel_ticket.certifier_vat">
+                    NIT certificador: <t t-esc="props.data.fel_ticket.certifier_vat"/>
+                </div>
+                <div t-if="props.data.fel_ticket.qr_image_src" class="text-center mt-2">
+                    <img t-att-src="props.data.fel_ticket.qr_image_src"
+                         class="ferreteria-fel-qr"
+                         alt="QR FEL"/>
+                </div>
+                <div t-if="props.data.fel_ticket.receipt_footer"
+                     class="ferreteria-fel-preline text-center mt-2"
+                     t-esc="props.data.fel_ticket.receipt_footer"/>
+            </div>
+        </xpath>
+    </t>
+</templates>
