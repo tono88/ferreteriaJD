@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_warehouse_orderpoint_form_stock_min_alert_ferre" model="ir.ui.view">
+        <field name="name">stock.warehouse.orderpoint.form.stock.min.alert.ferre</field>
+        <field name="model">stock.warehouse.orderpoint</field>
+        <field name="inherit_id" ref="stock.view_warehouse_orderpoint_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//sheet/group" position="after">
+                <group string="Alertas de inventario" groups="stock.group_stock_manager">
+                    <group>
+                        <field name="ferreteria_min_alert_active"/>
+                        <field name="ferreteria_min_alert_notification_count"/>
+                        <field name="ferreteria_min_alert_mail_id" readonly="1"/>
+                    </group>
+                    <group>
+                        <field name="ferreteria_min_alert_last_notified_at"/>
+                        <field name="ferreteria_min_alert_last_resolved_at"/>
+                        <button name="action_check_ferreteria_stock_min_alert_now"
+                                type="object"
+                                string="Revisar alerta ahora"
+                                class="btn-secondary"/>
+                    </group>
+                </group>
+            </xpath>
+        </field>
+    </record>
+
+    <record id="view_warehouse_orderpoint_tree_stock_min_alert_ferre" model="ir.ui.view">
+        <field name="name">stock.warehouse.orderpoint.list.stock.min.alert.ferre</field>
+        <field name="model">stock.warehouse.orderpoint</field>
+        <field name="inherit_id" ref="stock.view_warehouse_orderpoint_tree_editable"/>
+        <field name="arch" type="xml">
+            <xpath expr="//field[@name='qty_to_order']" position="after">
+                <field name="ferreteria_min_alert_active" optional="hide"/>
+                <field name="ferreteria_min_alert_last_notified_at" optional="hide"/>
+            </xpath>
+        </field>
+    </record>
+
+    <record id="stock_reorder_report_search_stock_min_alert_ferre" model="ir.ui.view">
+        <field name="name">stock.warehouse.orderpoint.reorder.search.stock.min.alert.ferre</field>
+        <field name="model">stock.warehouse.orderpoint</field>
+        <field name="inherit_id" ref="stock.stock_reorder_report_search"/>
+        <field name="arch" type="xml">
+            <xpath expr="//group" position="before">
+                <filter string="Alerta enviada"
+                        name="ferreteria_alert_active"
+                        domain="[('ferreteria_min_alert_active', '=', True)]"/>
+            </xpath>
+        </field>
+    </record>
+</odoo>

@@ -1,6 +1,6 @@
 {
     'name': 'POS Sales Summary Report (Date Range, Payment Split, Invoice Filter)',
-    'version': '18.0.1.3.0',
+    'version': '18.0.1.4.0',
     'summary': 'Reporte PDF de ventas POS por rango de fechas. Contado=Efectivo, Crédito=Otros métodos. Filtro por facturadas/NO facturadas.',
     'author': 'ChatGPT Assist',
     'website': '',

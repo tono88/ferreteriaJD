@@ -130,6 +130,8 @@ class PosOrder(models.Model):
                 "status": "not_invoiced",
                 "certified": False,
                 "message": _("La orden no tiene una factura vinculada."),
+                "internal_correlative": self.internal_correlative or "",
+                "order_reference": self.pos_reference or self.name or "",
             }
 
         authorization = xml_data.get("authorization") or self._first_field_value(
@@ -195,6 +197,7 @@ class PosOrder(models.Model):
             "message": "" if certified else _("Factura creada; certificación FEL pendiente."),
             "move_id": move.id,
             "move_name": move.name or "",
+            "internal_correlative": self.internal_correlative or move.internal_correlative or "",
             "document_type": document_type_label,
             "authorization": self._to_text(authorization),
             "series": self._to_text(series),

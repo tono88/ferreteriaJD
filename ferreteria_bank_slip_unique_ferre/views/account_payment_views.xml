@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<odoo>
+    <record id="view_account_payment_form_bank_slip_label" model="ir.ui.view">
+        <field name="name">account.payment.form.bank.slip.unique.ferre</field>
+        <field name="model">account.payment</field>
+        <field name="inherit_id" ref="base_accounting_kit_ferre.view_account_payment_form"/>
+        <field name="arch" type="xml">
+            <field name="bank_reference" position="attributes">
+                <attribute name="string">No. boleta bancaria</attribute>
+                <attribute name="placeholder">Número único por compañía</attribute>
+            </field>
+        </field>
+    </record>
+
+    <record id="view_account_payment_register_bank_slip_label" model="ir.ui.view">
+        <field name="name">account.payment.register.bank.slip.unique.ferre</field>
+        <field name="model">account.payment.register</field>
+        <field name="inherit_id" ref="base_accounting_kit_ferre.view_account_payment_register_form"/>
+        <field name="arch" type="xml">
+            <field name="bank_reference" position="attributes">
+                <attribute name="string">No. boleta bancaria</attribute>
+                <attribute name="placeholder">Número único por compañía</attribute>
+            </field>
+        </field>
+    </record>
+</odoo>

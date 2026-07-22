@@ -1,280 +1,250 @@
-
 # -*- coding: utf-8 -*-
+import re
+from collections import OrderedDict
+
+import pytz
+
 from odoo import api, fields, models, _
+
 
 class ReportPosSalesSummary(models.AbstractModel):
     _name = "report.pos_sales_summary_report_ferre.report_pos_sales_summary"
     _description = "Reporte PDF: Resumen de ventas POS"
-    @staticmethod
-    def _has_valid_invoice(o):
-        move = getattr(o, "account_move", False)
-        if not move:
-            return False
-        return getattr(move, "state", False) == "posted"
-    @staticmethod
-    def _is_invoiced_without_move(o):
-        """Orden marcada como facturada pero sin factura enlazada (factura eliminada)."""
-        return o.state == "invoiced" and not getattr(o, "account_move", False)
 
+    @staticmethod
+    def _has_valid_invoice(order):
+        move = getattr(order, "account_move", False)
+        return bool(move and move.state == "posted")
 
     def _normalize_pos_config_id(self, data):
-        """Devuelve el ID (int) del pos.config o None, ya venga plano o en data['form']."""
         if not data:
             return None
-        # Caso A: lo mandaste plano
-        val = data.get("pos_config_id")
-        if val:
-            if isinstance(val, (list, tuple)):
-                    return int(val[0])
-            return int(val)
-        # Caso B: viene en 'form'
-        form = data.get("form")
-        if isinstance(form, dict) and form.get("pos_config_id"):
-            val = form["pos_config_id"]
-            if isinstance(val, (list, tuple)):
-                return int(val[0])
-            return int(val)
-        return None
+        value = data.get("pos_config_id")
+        if not value and isinstance(data.get("form"), dict):
+            value = data["form"].get("pos_config_id")
+        if isinstance(value, (list, tuple)):
+            value = value[0]
+        return int(value) if value else None
 
-    def _is_cash_method(self, method):
+    @staticmethod
+    def _is_cash_method(method):
         if not method:
             return False
-        # Método efectivo (POS v18: flag is_cash_count)
         if getattr(method, "is_cash_count", False):
             return True
-        jrnl = getattr(method, "journal_id", False)
-        if jrnl and getattr(jrnl, "is_cash_count", False):
+        journal = getattr(method, "journal_id", False)
+        if journal and getattr(journal, "is_cash_count", False):
             return True
-        t = getattr(method, "type", None)
-        return isinstance(t, str) and t.lower() == "cash"
+        method_type = getattr(method, "type", None)
+        return isinstance(method_type, str) and method_type.lower() == "cash"
 
     def _split_payments(self, order):
-        contado = 0.0
-        credito = 0.0
-        for p in order.payment_ids:
-            # <<< AÑADE ESTAS LÍNEAS >>>
-            amt = p.amount or 0.0
-            if amt <= 0:
+        cash = 0.0
+        other = 0.0
+        for payment in order.payment_ids:
+            amount = payment.amount or 0.0
+            if amount <= 0:
                 continue
-            # ---------------------------
-            if self._is_cash_method(getattr(p, "payment_method_id", False)):
-                contado += p.amount or 0.0
+            if self._is_cash_method(payment.payment_method_id):
+                cash += amount
             else:
-                credito += p.amount or 0.0
-        return contado, credito
+                other += amount
+        return cash, other
 
-    def _fmt_amount(self, amt, currency):
-        amt = amt or 0.0
-        text = "{:,.2f}".format(amt)
+    @staticmethod
+    def _format_amount(amount, currency):
+        text = "{:,.2f}".format(amount or 0.0)
         if not currency:
             return text
-        if getattr(currency, "position", "before") == "before":
+        if currency.position == "before":
             return f"{currency.symbol} {text}"
         return f"{text} {currency.symbol}"
 
-    def _line_from_order(self, order, currency):
-        partner = order.partner_id.name or _("Consumidor Final")
-        move = getattr(order, "account_move", False)
-        #factura = move.name if move else "-"
-        firma = "-"
-        if move:
-            # usa firma_fel si existe; si no, cae al nombre (número) de la factura
-            firma = getattr(move, "firma_fel", False) or move.name or "-"
+    def _report_timezone(self):
+        timezone_name = (
+            self.env.user.tz
+            or self.env.company.partner_id.tz
+            or "America/Guatemala"
+        )
+        try:
+            pytz.timezone(timezone_name)
+        except pytz.UnknownTimeZoneError:
+            timezone_name = "America/Guatemala"
+        return timezone_name
 
-        contado, credito = self._split_payments(order)
+    def _order_local_date(self, order):
+        if not order.date_order:
+            return False
+        localized = fields.Datetime.context_timestamp(
+            order.with_context(tz=self._report_timezone()), order.date_order
+        )
+        return localized.date()
+
+    def _document_date_data(self, order):
+        move = order.account_move
+        if move and move.state == "posted" and move.invoice_date:
+            return move.invoice_date, ""
+
+        fallback_date = self._order_local_date(order)
+        if not move and order.state == "invoiced":
+            observation = _("Orden facturada sin factura vinculada")
+        elif move and move.state == "cancel":
+            observation = _("Factura cancelada")
+        elif move and move.state == "draft":
+            observation = _("Factura en borrador")
+        elif move and move.state == "posted" and not move.invoice_date:
+            observation = _("Factura publicada sin fecha")
+        elif move and move.state not in ("posted", "draft", "cancel"):
+            observation = _("Estado de factura: %s") % move.state
+        else:
+            observation = ""
+        return fallback_date, observation
+
+    def _line_from_order(self, order, currency):
+        move = order.account_move
+        invoice = "-"
+        if move:
+            invoice = getattr(move, "firma_fel", False) or move.name or "-"
+
+        document_date, observation = self._document_date_data(order)
+        cash, other = self._split_payments(order)
         total = order.amount_total or 0.0
         return {
-            "partner": partner,
-            "correlative": getattr(order, "internal_correlative", "") or "-",
-            #"invoice": factura,
-            "invoice": firma,          # <--- aquí
-            "contado": contado,
-            "credito": credito,
+            "partner": order.partner_id.name or _("Consumidor Final"),
+            "correlative": order.internal_correlative or "-",
+            "invoice": invoice,
+            "document_date": document_date,
+            "document_date_label": document_date.strftime("%d/%m/%Y") if document_date else "-",
+            "observation": observation,
+            "contado": cash,
+            "credito": other,
             "total": total,
-            "contado_fmt": self._fmt_amount(contado, currency),
-            "credito_fmt": self._fmt_amount(credito, currency),
-            "total_fmt": self._fmt_amount(total, currency),
+            "contado_fmt": self._format_amount(cash, currency),
+            "credito_fmt": self._format_amount(other, currency),
+            "total_fmt": self._format_amount(total, currency),
             "order_name": order.name,
         }
 
-    @api.model
-    def _get_report_values(self, docids, data=None):
-        data = data or {}
+    @staticmethod
+    def _correlative_key(line):
+        value = (line.get("correlative") or "").strip()
+        match = re.match(r"^(.*?)(\d+)$", value)
+        if match:
+            return (match.group(1).casefold(), int(match.group(2)), value.casefold())
+        return (value.casefold(), -1, value.casefold())
+
+    def _search_orders(self, data):
         start_utc = data.get("start_utc")
         end_utc = data.get("end_utc")
         invoice_filter = data.get("invoice_filter", "all")
-        # 👇 NUEVO: siempre define pos_config_id
         pos_config_id = self._normalize_pos_config_id(data)
-        # 👇 NUEVO: lista de clientes seleccionados
         partner_ids = data.get("partner_ids") or []
         if isinstance(partner_ids, int):
             partner_ids = [partner_ids]
-            
-        # 👇 NUEVO: flag para alternar vista
-        order_by_correlative = bool(data.get("order_by_internal_correlative"))
-            
-            
-            
-            
-        #domain = [
-        #    ("state", "in", ["paid", "done", "invoiced"]),
-        #    ("state", "!=", "cancel"),   # ⬅️ añade esta línea
-        #    ("date_order", ">=", start_utc),
-        #    ("date_order", "<=", end_utc),
-        #]
-        #if invoice_filter == "invoiced":
-        #    domain += [("account_move", "!=", False)]
-        #elif invoice_filter == "not_invoiced":
-        #    domain += [("account_move", "=", False)]
-            
+
         domain = [
             ("state", "in", ["paid", "done", "invoiced"]),
-            ("state", "!=", "cancel"),   # ⬅️ mantiene fuera las órdenes canceladas
             ("date_order", ">=", start_utc),
             ("date_order", "<=", end_utc),
         ]
-        # Nota: el caso "not_invoiced" se filtrará más abajo en Python,
-        # para poder incluir también las órdenes con factura cancelada.
-        if invoice_filter == "invoiced":
-            # pequeña optimización: solo traemos órdenes que tengan alguna factura enlazada
-            domain += [("account_move", "!=", False)]
-          
-                    
-            
-        # 👇 CAMBIO: usar OR entre config_id y session_id.config_id
         if pos_config_id:
-            domain += ["|", ("config_id", "=", pos_config_id), ("session_id.config_id", "=", pos_config_id)]
-        # 👇 NUEVO: filtrar por clientes si se seleccionaron
+            domain += [
+                "|",
+                ("config_id", "=", pos_config_id),
+                ("session_id.config_id", "=", pos_config_id),
+            ]
         if partner_ids:
             domain.append(("partner_id", "in", partner_ids))
-        orders = self.env["pos.order"].search(domain, order="partner_id, date_order, name")
-        # --- EXCLUIR ORDENES ORIGEN QUE TENGAN UN REEMBOLSO EN EL RANGO ---
-        # Detectar reembolsos por nombre "REEMBOLSO DE …" y excluir su orden original
+
+        orders = self.env["pos.order"].search(
+            domain, order="partner_id, date_order, name"
+        )
+
+        # Preserve the existing business rule: if a refund order explicitly
+        # names its origin, show the refund and omit the original in the range.
         refund_domain = [
             ("state", "in", ["paid", "done", "invoiced"]),
             ("date_order", ">=", start_utc),
             ("date_order", "<=", end_utc),
-            ("amount_total", "<", 0),  # reembolsos suelen tener total negativo
+            ("amount_total", "<", 0),
         ]
-        
-        # 👇 nuevo también para reembolsos
         if pos_config_id:
-            refund_domain += ["|", ("config_id", "=", pos_config_id), ("session_id.config_id", "=", pos_config_id)]
-
-        refund_orders = self.env["pos.order"].search(refund_domain)
+            refund_domain += [
+                "|",
+                ("config_id", "=", pos_config_id),
+                ("session_id.config_id", "=", pos_config_id),
+            ]
         if partner_ids:
             refund_domain.append(("partner_id", "in", partner_ids))
-        # Extraer nombres originales desde "REEMBOLSO DE <NOMBRE-ORIGINAL>"
-        orig_names = []
-        for r in refund_orders:
-            n = (r.name or "").strip()
-            if n.upper().startswith("REEMBOLSO DE "):
-                orig_names.append(n.split("REEMBOLSO DE ", 1)[1].strip())
+        refund_orders = self.env["pos.order"].search(refund_domain)
+        original_names = set()
+        for refund in refund_orders:
+            name = (refund.name or "").strip()
+            if name.upper().startswith("REEMBOLSO DE "):
+                original_names.add(name[len("REEMBOLSO DE "):].strip())
+        if original_names:
+            orders = orders.filtered(lambda order: order.name not in original_names)
 
-        # Filtrar fuera esas órdenes originales del conjunto a reportar
-        if orig_names:
-            orders = orders.filtered(lambda o: o.name not in orig_names)
-        # --- FIN EXCLUSION ---
-
-        # --- Normalizar según el estado real de la factura asociada ---
-        # Consideramos "factura válida" únicamente cuando el move está en estado 'posted'.
-        # Esto evita que aparezcan en el reporte:
-        #   - Órdenes en estado FACTURADO pero cuya factura fue cancelada.
-        #   - Órdenes en estado FACTURADO pero a las que ya se les eliminó la factura.
-
-#        if invoice_filter == "all":
-#            # Dejamos:
-#            #   - todas las órdenes pagadas/done que NO están marcadas como facturadas
-#            #   - y solo las facturadas cuya factura siga vigente (posted)
-#            orders = orders.filtered(
-#                lambda o: o.state != "invoiced" or _has_valid_invoice(o)
-#            )
-#        elif invoice_filter == "invoiced":
-#            # Solo órdenes con factura vigente
-#            orders = orders.filtered(_has_valid_invoice)
-#        elif invoice_filter == "not_invoiced":
-#            # Órdenes sin factura o con factura cancelada/borrador
-#            orders = orders.filtered(lambda o: not _has_valid_invoice(o))
-#        # --- FIN NORMALIZACIÓN FACTURA ---
-
-        if invoice_filter == "all":
-            # Igual que antes, pero explícitamente dejamos fuera las
-            # órdenes facturadas sin factura enlazada.
-            orders = orders.filtered(
-                lambda o: (o.state != "invoiced" or self._has_valid_invoice(o))
-                and not self._is_invoiced_without_move(o)
-            )
-
-        elif invoice_filter == "invoiced":
-            # Solo órdenes con factura vigente (posted)
+        if invoice_filter == "invoiced":
             orders = orders.filtered(self._has_valid_invoice)
-
         elif invoice_filter == "not_invoiced":
-            # Solo órdenes que NO están en estado facturado.
-            # Si la orden está en estado 'invoiced', se excluye aunque su factura esté cancelada.
-            orders = orders.filtered(lambda o: o.state != "invoiced")
+            orders = orders.filtered(lambda order: not self._has_valid_invoice(order))
+        return orders
 
-
-
+    @api.model
+    def _get_report_values(self, docids, data=None):
+        data = data or {}
+        orders = self._search_orders(data)
         currency = self.env.company.currency_id
         lines = []
-        invs = []
-        for o in orders:
-            L = self._line_from_order(o, currency)
-            if L["contado"] == 0 and L["credito"] == 0:
+        invoice_references = []
+        for order in orders:
+            line = self._line_from_order(order, currency)
+            if line["contado"] == 0 and line["credito"] == 0:
                 continue
-            lines.append(L)
-            
+            lines.append(line)
+            if line["invoice"] != "-":
+                invoice_references.append(line["invoice"])
 
-            if L["invoice"] and L["invoice"] != "-":
-                invs.append(L["invoice"])
+        order_by_correlative = bool(data.get("order_by_internal_correlative"))
+        lines_linear = (
+            sorted(lines, key=self._correlative_key)
+            if order_by_correlative
+            else list(lines)
+        )
 
-        total_contado = sum(l["contado"] for l in lines)
-        total_credito = sum(l["credito"] for l in lines)
-        total_general = sum(l["total"] for l in lines)
-        
-        
-        # 👇 NUEVO: lista lineal ordenada por correlativo interno
-        if order_by_correlative:
-            def _correlative_key(line):
-                corr = line.get("correlative") or ""
-                try:
-                    return (0, int(corr))
-                except (TypeError, ValueError):
-                    return (1, str(corr))
-            lines_linear = sorted(lines, key=_correlative_key)
-        else:
-            # modo original: simplemente usamos la lista tal cual
-            lines_linear = lines
+        grouped = OrderedDict()
+        for line in lines:
+            grouped.setdefault(line["partner"], []).append(line)
+        grouped_list = [
+            {"partner": partner, "lines": partner_lines}
+            for partner, partner_lines in sorted(
+                grouped.items(), key=lambda item: (item[0] or "").casefold()
+            )
+        ]
 
+        total_cash = sum(line["contado"] for line in lines)
+        total_other = sum(line["credito"] for line in lines)
+        total_general = sum(line["total"] for line in lines)
+        now = fields.Datetime.context_timestamp(self.env.user, fields.Datetime.now())
 
-        # Agrupar por partner
-        grouped_map = {}
-        for l in lines:
-            grouped_map.setdefault(l["partner"], []).append(l)
-        grouped_list = [{"partner": k, "lines": v} for k, v in grouped_map.items()]
-        grouped_list.sort(key=lambda g: g["partner"] or "")
-
-        first_inv = invs[0] if invs else "-"
-        last_inv = invs[-1] if invs else "-"
-
-        now_dt = fields.Datetime.context_timestamp(self.env.user, fields.Datetime.now())
         return {
             "doc_ids": docids,
             "doc_model": "pos.order",
             "data": data,
             "grouped": grouped_list,
-            # 👇 NUEVO: lista plana para vista lineal por correlativo
             "lines_linear": lines_linear,
-            "total_contado": total_contado,
-            "total_credito": total_credito,
+            "order_by_internal_correlative": order_by_correlative,
+            "total_contado": total_cash,
+            "total_credito": total_other,
             "total_general": total_general,
-            "total_contado_fmt": self._fmt_amount(total_contado, currency),
-            "total_credito_fmt": self._fmt_amount(total_credito, currency),
-            "total_general_fmt": self._fmt_amount(total_general, currency),
-            "first_invoice": first_inv,
-            "last_invoice": last_inv,
+            "total_contado_fmt": self._format_amount(total_cash, currency),
+            "total_credito_fmt": self._format_amount(total_other, currency),
+            "total_general_fmt": self._format_amount(total_general, currency),
+            "first_invoice": invoice_references[0] if invoice_references else "-",
+            "last_invoice": invoice_references[-1] if invoice_references else "-",
             "user_label": self.env.user.name,
-            "now_label": now_dt.strftime("%d/%m/%Y %I:%M:%S %p"),
+            "now_label": now.strftime("%d/%m/%Y %I:%M:%S %p"),
             "company": self.env.company,
+            "report_timezone": self._report_timezone(),
         }

@@ -1,0 +1,15 @@
+{
+    "name": "POS Product Reference Display Ferre",
+    "summary": "Muestra [Referencia interna] Nombre y permite buscar por referencia o nombre en POS",
+    "version": "18.0.1.0.0",
+    "category": "Point of Sale",
+    "author": "Distribuidora y Ferretería JB / OCA contributors",
+    "website": "",
+    "license": "AGPL-3",
+    "depends": ["point_of_sale"],
+    "data": [],
+    "assets": {},
+    "installable": True,
+    "application": False,
+    "auto_install": False,
+}

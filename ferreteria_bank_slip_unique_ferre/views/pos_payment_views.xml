@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<odoo>
+    <record id="view_pos_order_payment_tree_bank_slip" model="ir.ui.view">
+        <field name="name">pos.order.payment.list.bank.slip.ferre</field>
+        <field name="model">pos.order.payment</field>
+        <field name="inherit_id" ref="pos_order_manual_payment_ferre.view_pos_order_payment_tree"/>
+        <field name="arch" type="xml">
+            <field name="reference" position="after">
+                <field name="bank_slip_number" optional="show"/>
+            </field>
+        </field>
+    </record>
+
+    <record id="view_pos_order_payment_wizard_bank_slip" model="ir.ui.view">
+        <field name="name">pos.order.payment.wizard.bank.slip.ferre</field>
+        <field name="model">pos.order.payment.wizard</field>
+        <field name="inherit_id" ref="pos_order_manual_payment_ferre.view_pos_order_payment_wizard_form"/>
+        <field name="arch" type="xml">
+            <field name="reference" position="after">
+                <field name="bank_slip_number" placeholder="Número único por compañía"/>
+            </field>
+        </field>
+    </record>
+
+    <record id="view_pos_order_payment_master_tree_bank_slip" model="ir.ui.view">
+        <field name="name">pos.order.payment.master.list.bank.slip.ferre</field>
+        <field name="model">pos.order.payment.master</field>
+        <field name="inherit_id" ref="pos_order_master_payment_ferre.view_pos_order_payment_master_tree"/>
+        <field name="arch" type="xml">
+            <field name="reference" position="after">
+                <field name="bank_slip_number" optional="show"/>
+            </field>
+        </field>
+    </record>
+
+    <record id="view_pos_order_payment_master_form_bank_slip" model="ir.ui.view">
+        <field name="name">pos.order.payment.master.form.bank.slip.ferre</field>
+        <field name="model">pos.order.payment.master</field>
+        <field name="inherit_id" ref="pos_order_master_payment_ferre.view_pos_order_payment_master_form"/>
+        <field name="arch" type="xml">
+            <field name="reference" position="after">
+                <field name="bank_slip_number" placeholder="Número único por compañía"/>
+            </field>
+        </field>
+    </record>
+
+    <record id="view_pos_order_master_payment_wizard_bank_slip" model="ir.ui.view">
+        <field name="name">pos.order.payment.master.wizard.bank.slip.ferre</field>
+        <field name="model">pos.order.payment.master.wizard</field>
+        <field name="inherit_id" ref="pos_order_master_payment_ferre.view_pos_order_master_payment_wizard_form"/>
+        <field name="arch" type="xml">
+            <field name="reference" position="after">
+                <field name="bank_slip_number" placeholder="Número único por compañía"/>
+            </field>
+        </field>
+    </record>
+</odoo>

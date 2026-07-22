@@ -28,6 +28,16 @@
         </xpath>
 
         <xpath expr="//OrderWidget" position="before">
+            <!-- Venta POS sin factura: los datos se consultan al servidor en la
+                 pantalla de recibo. Solo se agrega la línea visual del correlativo;
+                 no se modifica el modelo PosOrder ni la serialización estándar. -->
+            <div t-if="props.data.fel_ticket
+                       and props.data.fel_ticket.status == 'not_invoiced'
+                       and props.data.fel_ticket.internal_correlative"
+                 class="text-center fw-bolder mb-1">
+                No. interno: <t t-esc="props.data.fel_ticket.internal_correlative"/>
+            </div>
+
             <div t-if="props.data.fel_ticket and props.data.fel_ticket.enabled"
                  class="ferreteria-fel-document-data">
                 <div class="text-center fw-bolder">Documento Tributario Electrónico FEL</div>
@@ -40,6 +50,9 @@
                     PENDIENTE DE CERTIFICACIÓN FEL
                 </div>
                 <div class="mt-1">Fecha: <t t-esc="props.data.fel_ticket.issue_datetime or props.data.date"/></div>
+                <div class="fw-bolder">
+                    No. interno: <t t-esc="props.data.fel_ticket.internal_correlative or 'No asignado'"/>
+                </div>
                 <div t-if="props.data.fel_ticket.cashier">Cajero: <t t-esc="props.data.fel_ticket.cashier"/></div>
                 <div t-if="props.data.fel_ticket.pos_name">Punto de venta: <t t-esc="props.data.fel_ticket.pos_name"/></div>
                 <div class="ferreteria-fel-separator">--------------------------------</div>

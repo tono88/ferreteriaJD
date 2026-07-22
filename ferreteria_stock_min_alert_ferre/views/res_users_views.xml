@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_users_form_stock_min_alert_ferre" model="ir.ui.view">
+        <field name="name">res.users.form.stock.min.alert.ferre</field>
+        <field name="model">res.users</field>
+        <field name="inherit_id" ref="base.view_users_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//notebook" position="inside">
+                <page string="Alertas de inventario" groups="base.group_system">
+                    <div class="alert alert-info" role="alert">
+                        Los usuarios marcados recibirán un correo cuando una regla de reabastecimiento quede por debajo de su mínimo. El usuario debe tener un correo válido y Odoo debe contar con un servidor SMTP saliente configurado.
+                    </div>
+                    <group>
+                        <field name="ferreteria_receive_stock_min_alerts"/>
+                        <field name="email" readonly="1"/>
+                    </group>
+                </page>
+            </xpath>
+        </field>
+    </record>
+</odoo>

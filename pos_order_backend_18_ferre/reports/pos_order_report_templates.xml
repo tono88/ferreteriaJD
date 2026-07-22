@@ -37,6 +37,7 @@
                 <div class="col-6">
                   <h4>Order Info</h4>
                   <div>Reference: <span t-esc="o.pos_reference or o.name"/></div>
+                  <div><strong>No. interno:</strong> <span t-esc="o.internal_correlative or 'No asignado'"/></div>
                   <div>Date: <span t-esc="o.date_order"/></div>
                   <div>Cashier: <span t-esc="o.user_id.display_name"/></div>
                   <div>Session: <span t-esc="o.session_id.display_name"/></div>

@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 {
     "name": "Megaprint FEL: Correlativo POS en Reporte",
-    "version": "18.0.1.0.1",
+    "version": "18.0.1.0.2",
     "summary": "Inserta el correlativo interno del POS en el bloque DTE del reporte FEL (Megaprint)",
     "author": "ChatGPT Assist",
     "license": "LGPL-3",

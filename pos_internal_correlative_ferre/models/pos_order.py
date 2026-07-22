@@ -1,4 +1,4 @@
-# pos_internal_correlative/models/pos_order.py
+# -*- coding: utf-8 -*-
 import random
 import time
 
@@ -17,119 +17,76 @@ class PosOrder(models.Model):
     )
 
     def _next_correlative_for_session(self, session_id, invoiced=False):
-        """Devuelve el siguiente número usando la secuencia del POS de la sesión.
-
-        No genera números en create_from_ui(). La asignación queda centralizada
-        en create() para evitar saltos por reintentos del POS.
-        """
+        """Return the next sequence configured for the POS session."""
         if not session_id:
             return False
-
         session = self.env["pos.session"].browse(session_id).exists()
-        if not session:
+        if not session or not session.config_id:
             return False
 
-        config = session.config_id
-        if not config:
+        config = session.config_id.sudo()
+        config._ensure_internal_sequence()
+        sequence = (
+            config.pos_internal_sequence_id
+            if invoiced
+            else config.pos_internal_sequence_no_invoice_id
+        )
+        sequence = sequence or (
+            config.pos_internal_sequence_no_invoice_id
+            if invoiced
+            else config.pos_internal_sequence_id
+        )
+        if not sequence:
             return False
 
-        # Puede ejecutarse como cajero; las operaciones técnicas van con sudo.
-        config.sudo()._ensure_internal_sequence()
-
-        config_sudo = config.sudo()
-        if invoiced:
-            seq = (
-                config_sudo.pos_internal_sequence_id
-                or config_sudo.pos_internal_sequence_no_invoice_id
-            )
-        else:
-            seq = (
-                config_sudo.pos_internal_sequence_no_invoice_id
-                or config_sudo.pos_internal_sequence_id
-            )
-
-        if not seq:
-            return False
-
-        seq_sudo = seq.sudo()
-        # Si por historial la secuencia quedó como no_gap, puede lanzar:
-        # "could not obtain lock on row in relation ir_sequence" cuando dos POS
-        # consumen el mismo correlativo al mismo tiempo. Reintentamos dentro de
-        # savepoint para no dejar abortada la transacción del pedido.
         for attempt in range(5):
             try:
                 with self.env.cr.savepoint():
-                    return seq_sudo.next_by_id()
+                    return sequence.sudo().next_by_id()
             except OperationalError as exc:
-                msg = str(exc).lower()
-                if "could not obtain lock" not in msg and "lock not available" not in msg:
+                message = str(exc).lower()
+                if "could not obtain lock" not in message and "lock not available" not in message:
                     raise
-                time.sleep(0.15 + random.random() * 0.25)
-        # Último intento: si sigue bloqueada, dejamos que Odoo muestre el error real.
-        return seq_sudo.next_by_id()
-
-    @api.model
-    def _order_fields(self, ui_order):
-        """Permite aceptar el campo si alguna versión/parche del POS lo envía.
-
-        No generamos números aquí. Solo copiamos un valor ya existente, porque
-        este método puede ejecutarse dentro de flujos que luego se reintentan.
-        """
-        vals = super()._order_fields(ui_order)
-        if ui_order.get("internal_correlative"):
-            vals["internal_correlative"] = ui_order["internal_correlative"]
-        return vals
+                if attempt < 4:
+                    time.sleep(0.15 + random.random() * 0.25)
+        return sequence.sudo().next_by_id()
 
     @api.model_create_multi
     def create(self, vals_list):
         for vals in vals_list:
-            if not vals.get("internal_correlative"):
-                invoiced = bool(vals.get("to_invoice") or vals.get("is_invoiced"))
-                correlative = self._next_correlative_for_session(
-                    vals.get("session_id"),
-                    invoiced=invoiced,
+            if vals.get("internal_correlative"):
+                continue
+            invoiced = bool(vals.get("to_invoice") or vals.get("is_invoiced"))
+            correlative = self._next_correlative_for_session(
+                vals.get("session_id"), invoiced=invoiced
+            )
+            if not correlative:
+                correlative = self.env["ir.sequence"].sudo().next_by_code(
+                    "pos.internal.correlative"
                 )
-                if not correlative:
-                    correlative = self.env["ir.sequence"].sudo().next_by_code(
-                        "pos.internal.correlative"
-                    )
-                if correlative:
-                    vals["internal_correlative"] = correlative
-        records = super().create(vals_list)
-        for order in records:
-            try:
-                move = getattr(order, "account_move", False)
-                if move and order.internal_correlative and not move.internal_correlative:
-                    move.sudo().write({"internal_correlative": order.internal_correlative})
-            except Exception:
-                # El correlativo no debe romper la venta ni la facturación FEL.
-                pass
-        return records
+            if correlative:
+                vals["internal_correlative"] = correlative
+        return super().create(vals_list)
 
-    @api.model
-    def create_from_ui(self, orders, draft=False):
-        """No consumir secuencias antes del super.
+    def _prepare_invoice_vals(self):
+        """Copy the POS number while the invoice values are being prepared.
 
-        Antes el módulo hacía next_by_id() aquí y luego Odoo podía ignorar el
-        campo o reintentar la orden, causando saltos grandes. La asignación real
-        queda centralizada en create(). Al final solo devolvemos el correlativo
-        al frontend si el formato de respuesta de Odoo lo permite.
+        This is more reliable than trying to discover the relation after the
+        account.move has already been created.
         """
-        result = super().create_from_ui(orders, draft=draft)
+        self.ensure_one()
+        vals = super()._prepare_invoice_vals()
+        if self.internal_correlative:
+            vals["internal_correlative"] = self.internal_correlative
+        return vals
 
-        if isinstance(result, list):
-            ids = [
-                r.get("id")
-                for r in result
-                if isinstance(r, dict) and r.get("id")
-            ]
-            if ids:
-                by_id = {
-                    order.id: order.internal_correlative
-                    for order in self.browse(ids).exists()
-                    if order.internal_correlative
-                }
-                for r in result:
-                    if isinstance(r, dict) and r.get("id") in by_id:
-                        r["internal_correlative"] = by_id[r["id"]]
+    def _sync_internal_correlative_to_invoice(self):
+        for order in self.filtered("internal_correlative"):
+            move = order.account_move
+            if move and move.internal_correlative != order.internal_correlative:
+                move.sudo().write({"internal_correlative": order.internal_correlative})
+
+    def _generate_pos_order_invoice(self):
+        result = super()._generate_pos_order_invoice()
+        self._sync_internal_correlative_to_invoice()
         return result
