@@ -913,6 +913,34 @@ class FerreteriaTransferRequest(models.Model):
         ):
             raise UserError(_("La configuración del picking vinculado fue modificada y ya no coincide con la solicitud."))
 
+        dispatch_picking = self.env["stock.picking"]
+        expected_dispatch_moves = self.env["stock.move"].sudo()
+        if stage == "receipt":
+            # El receptor de destino no debe obtener acceso al picking del
+            # almacén origen. La elevación queda limitada a leer y comprobar
+            # los registros inmutables ya vinculados por la solicitud.
+            dispatch_picking = self.dispatch_picking_id.sudo()
+            if (
+                not dispatch_picking
+                or dispatch_picking.ferreteria_transfer_request_id.id != self.id
+                or dispatch_picking.ferreteria_transfer_stage != "dispatch"
+                or dispatch_picking.company_id.id != self.company_id.id
+                or dispatch_picking.picking_type_id.id
+                != self.supplying_warehouse_id.int_type_id.id
+                or dispatch_picking.location_id.id
+                != self.supplying_warehouse_id.lot_stock_id.id
+                or dispatch_picking.location_dest_id.id != self.transit_location_id.id
+                or dispatch_picking.state != "done"
+                or picking.state
+                not in ("confirmed", "waiting", "assigned", "partially_available")
+            ):
+                raise UserError(
+                    _(
+                        "La estructura o el estado de los pickings vinculados ya no "
+                        "coincide con la solicitud despachada."
+                    )
+                )
+
         expected_moves = self.env["stock.move"]
         for line in self.line_ids.filtered(lambda current: current.approved_qty > 0):
             move = line[move_field]
@@ -936,10 +964,6 @@ class FerreteriaTransferRequest(models.Model):
                 or move.location_dest_id != expected_destination
                 or move.company_id != self.company_id
                 or invalid_move_lines
-                or (
-                    stage == "receipt"
-                    and line.dispatch_move_id not in move.move_orig_ids
-                )
                 or float_compare(
                     move.product_uom_qty,
                     line.approved_qty,
@@ -952,9 +976,61 @@ class FerreteriaTransferRequest(models.Model):
                         product=line.product_id.display_name,
                     )
                 )
+            if stage == "receipt":
+                dispatch_move = line.dispatch_move_id.sudo()
+                expected_dispatch_moves |= dispatch_move
+                invalid_dispatch_lines = dispatch_move.move_line_ids.filtered(
+                    lambda move_line: (
+                        move_line.move_id.id != dispatch_move.id
+                        or move_line.product_id.id != line.product_id.id
+                        or move_line.location_id.id
+                        != self.supplying_warehouse_id.lot_stock_id.id
+                        or move_line.location_dest_id.id != self.transit_location_id.id
+                        or move_line.company_id.id != self.company_id.id
+                    )
+                )
+                if (
+                    not dispatch_move
+                    or dispatch_move.picking_id.id != dispatch_picking.id
+                    or dispatch_move.product_id.id != line.product_id.id
+                    or dispatch_move.product_uom.id != line.product_uom_id.id
+                    or dispatch_move.location_id.id
+                    != self.supplying_warehouse_id.lot_stock_id.id
+                    or dispatch_move.location_dest_id.id != self.transit_location_id.id
+                    or dispatch_move.company_id.id != self.company_id.id
+                    or dispatch_move.state != "done"
+                    or invalid_dispatch_lines
+                    or float_compare(
+                        dispatch_move.product_uom_qty,
+                        line.approved_qty,
+                        precision_rounding=line.product_uom_id.rounding,
+                    )
+                    != 0
+                    or float_compare(
+                        dispatch_move.quantity,
+                        line.dispatched_qty,
+                        precision_rounding=line.product_uom_id.rounding,
+                    )
+                    != 0
+                ):
+                    raise UserError(
+                        _(
+                            "El despacho de %(product)s fue modificado y ya no "
+                            "coincide con la solicitud.",
+                            product=line.product_id.display_name,
+                        )
+                    )
         actual_moves = picking.move_ids.filtered(lambda move: move.state != "cancel")
         if set(actual_moves.ids) != set(expected_moves.ids):
             raise UserError(_("El picking contiene movimientos adicionales o faltantes."))
+        if stage == "receipt":
+            actual_dispatch_moves = dispatch_picking.move_ids.filtered(
+                lambda move: move.state != "cancel"
+            )
+            if set(actual_dispatch_moves.ids) != set(expected_dispatch_moves.ids):
+                raise UserError(
+                    _("El picking de despacho contiene movimientos adicionales o faltantes.")
+                )
         return picking
 
     def action_dispatch(self):

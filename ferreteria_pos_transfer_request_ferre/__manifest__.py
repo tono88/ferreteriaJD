@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 {
     "name": "Ferretería - Solicitudes entre sucursales",
-    "version": "18.0.2.3.1",
+    "version": "18.0.2.3.2",
     "summary": "Solicitudes, aprobación, reserva, despacho y recepción entre sucursales",
     "category": "Inventory/Inventory",
     "author": "Custom",

@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
 {
     "name": "Ferretería - Alertas de reabastecimiento por correo",
-    "version": "18.0.1.0.0",
-    "summary": "Envía una sola alerta por correo cuando una regla de reabastecimiento cae por debajo de su mínimo",
+    "version": "18.0.1.0.2",
+    "summary": "Envía automáticamente una sola alerta por correo cuando el inventario cae por debajo del mínimo",
     "category": "Inventory/Inventory",
     "author": "Custom",
     "license": "LGPL-3",

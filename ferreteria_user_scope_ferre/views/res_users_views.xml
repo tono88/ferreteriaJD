@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_users_form_ferreteria_scope" model="ir.ui.view">
+        <field name="name">res.users.form.ferreteria.scope</field>
+        <field name="model">res.users</field>
+        <field name="inherit_id" ref="base.view_users_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//notebook" position="inside">
+                <page string="Ámbito Ferretería" groups="base.group_system">
+                    <group>
+                        <field name="ferreteria_scope_enforced"/>
+                        <field name="ferreteria_allowed_pos_ids"
+                               widget="many2many_tags"
+                               invisible="not ferreteria_scope_enforced"/>
+                        <field name="ferreteria_allowed_warehouse_ids"
+                               widget="many2many_tags"
+                               invisible="not ferreteria_scope_enforced"/>
+                        <field name="ferreteria_sales_readonly"/>
+                    </group>
+                </page>
+            </xpath>
+        </field>
+    </record>
+</odoo>

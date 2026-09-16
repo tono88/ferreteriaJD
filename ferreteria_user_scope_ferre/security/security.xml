@@ -1,0 +1,135 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="module_category_ferreteria_security" model="ir.module.category">
+        <field name="name">Seguridad Ferretería</field>
+        <field name="description">Perfiles reutilizables con mínimo privilegio.</field>
+        <field name="sequence">36</field>
+    </record>
+
+    <record id="group_sale_readonly" model="res.groups">
+        <field name="name">Ventas: solo consulta</field>
+        <field name="category_id" ref="module_category_ferreteria_security"/>
+        <field name="implied_ids" eval="[(4, ref('sales_team.group_sale_salesman_all_leads'))]"/>
+    </record>
+
+    <!-- POS: las reglas son globales para que no puedan ser anuladas por la
+         unión de reglas permisivas de otros grupos estándar. El opt-in por
+         usuario conserva el comportamiento completo de administradores. -->
+    <record id="rule_pos_config_scope" model="ir.rule">
+        <field name="name">Ferretería: POS permitidos</field>
+        <field name="model_id" ref="point_of_sale.model_pos_config"/>
+        <field name="global" eval="True"/>
+        <field name="domain_force">[(1, '=', 1)] if not user.ferreteria_scope_enforced else [('id', 'in', user.ferreteria_allowed_pos_ids.ids)]</field>
+    </record>
+    <record id="rule_pos_session_scope" model="ir.rule">
+        <field name="name">Ferretería: sesiones de POS permitidos</field>
+        <field name="model_id" ref="point_of_sale.model_pos_session"/>
+        <field name="global" eval="True"/>
+        <field name="domain_force">[(1, '=', 1)] if not user.ferreteria_scope_enforced else [('config_id', 'in', user.ferreteria_allowed_pos_ids.ids)]</field>
+    </record>
+    <record id="rule_pos_order_scope" model="ir.rule">
+        <field name="name">Ferretería: órdenes de POS permitidos</field>
+        <field name="model_id" ref="point_of_sale.model_pos_order"/>
+        <field name="global" eval="True"/>
+        <field name="domain_force">[(1, '=', 1)] if not user.ferreteria_scope_enforced else [('config_id', 'in', user.ferreteria_allowed_pos_ids.ids)]</field>
+    </record>
+    <record id="rule_pos_order_line_scope" model="ir.rule">
+        <field name="name">Ferretería: líneas de POS permitidos</field>
+        <field name="model_id" ref="point_of_sale.model_pos_order_line"/>
+        <field name="global" eval="True"/>
+        <field name="domain_force">[(1, '=', 1)] if not user.ferreteria_scope_enforced else [('order_id.config_id', 'in', user.ferreteria_allowed_pos_ids.ids)]</field>
+    </record>
+    <record id="rule_pos_payment_scope" model="ir.rule">
+        <field name="name">Ferretería: pagos de POS permitidos</field>
+        <field name="model_id" ref="point_of_sale.model_pos_payment"/>
+        <field name="global" eval="True"/>
+        <field name="domain_force">[(1, '=', 1)] if not user.ferreteria_scope_enforced else [('pos_order_id.config_id', 'in', user.ferreteria_allowed_pos_ids.ids)]</field>
+    </record>
+    <record id="rule_pos_payment_method_scope" model="ir.rule">
+        <field name="name">Ferretería: métodos de pago del POS permitido</field>
+        <field name="model_id" ref="point_of_sale.model_pos_payment_method"/>
+        <field name="global" eval="True"/>
+        <field name="domain_force">[(1, '=', 1)] if not user.ferreteria_scope_enforced else [('config_ids', 'in', user.ferreteria_allowed_pos_ids.ids)]</field>
+    </record>
+    <record id="rule_pos_manual_payment_scope" model="ir.rule">
+        <field name="name">Ferretería: pagos manuales del POS permitido</field>
+        <field name="model_id" ref="pos_order_manual_payment_ferre.model_pos_order_payment"/>
+        <field name="global" eval="True"/>
+        <field name="domain_force">[(1, '=', 1)] if not user.ferreteria_scope_enforced else [('pos_order_id.config_id', 'in', user.ferreteria_allowed_pos_ids.ids)]</field>
+    </record>
+    <record id="rule_pos_master_payment_scope" model="ir.rule">
+        <field name="name">Ferretería: pagos maestros del POS permitido</field>
+        <field name="model_id" ref="pos_order_master_payment_ferre.model_pos_order_payment_master"/>
+        <field name="global" eval="True"/>
+        <field name="domain_force">[(1, '=', 1)] if not user.ferreteria_scope_enforced else ['|', ('order_ids.config_id', 'in', user.ferreteria_allowed_pos_ids.ids), '&amp;', ('order_ids', '=', False), ('create_uid', '=', user.id)]</field>
+    </record>
+
+    <!-- Ventas por almacén -->
+    <record id="rule_sale_order_scope" model="ir.rule">
+        <field name="name">Ferretería: ventas por almacén permitido</field>
+        <field name="model_id" ref="sale.model_sale_order"/>
+        <field name="global" eval="True"/>
+        <field name="domain_force">[(1, '=', 1)] if not user.ferreteria_scope_enforced else [('warehouse_id', 'in', user.ferreteria_allowed_warehouse_ids.ids)]</field>
+    </record>
+    <record id="rule_sale_order_line_scope" model="ir.rule">
+        <field name="name">Ferretería: líneas de venta por almacén permitido</field>
+        <field name="model_id" ref="sale.model_sale_order_line"/>
+        <field name="global" eval="True"/>
+        <field name="domain_force">[(1, '=', 1)] if not user.ferreteria_scope_enforced else [('order_id.warehouse_id', 'in', user.ferreteria_allowed_warehouse_ids.ids)]</field>
+    </record>
+
+    <!-- Bloqueo de escritura para el perfil histórico de consulta. -->
+    <record id="rule_sale_order_readonly_write" model="ir.rule">
+        <field name="name">Ferretería: ventas solo consulta (pedidos)</field>
+        <field name="model_id" ref="sale.model_sale_order"/>
+        <field name="global" eval="True"/>
+        <field name="domain_force">[('id', '=', False)] if user.ferreteria_sales_readonly else [(1, '=', 1)]</field>
+        <field name="perm_read" eval="False"/><field name="perm_write" eval="True"/><field name="perm_create" eval="True"/><field name="perm_unlink" eval="True"/>
+    </record>
+    <record id="rule_sale_order_line_readonly_write" model="ir.rule">
+        <field name="name">Ferretería: ventas solo consulta (líneas)</field>
+        <field name="model_id" ref="sale.model_sale_order_line"/>
+        <field name="global" eval="True"/>
+        <field name="domain_force">[('id', '=', False)] if user.ferreteria_sales_readonly else [(1, '=', 1)]</field>
+        <field name="perm_read" eval="False"/><field name="perm_write" eval="True"/><field name="perm_create" eval="True"/><field name="perm_unlink" eval="True"/>
+    </record>
+
+    <!-- Inventario. Los almacenes se mantienen legibles para seleccionar la
+         contraparte de una transferencia, pero sus operaciones quedan acotadas. -->
+    <record id="rule_stock_picking_type_scope" model="ir.rule">
+        <field name="name">Ferretería: tipos de operación permitidos</field>
+        <field name="model_id" ref="stock.model_stock_picking_type"/>
+        <field name="global" eval="True"/>
+        <field name="domain_force">[(1, '=', 1)] if not user.ferreteria_scope_enforced else ['|', ('warehouse_id', '=', False), ('warehouse_id', 'in', user.ferreteria_allowed_warehouse_ids.ids)]</field>
+    </record>
+    <record id="rule_stock_location_scope" model="ir.rule">
+        <field name="name">Ferretería: ubicaciones operables</field>
+        <field name="model_id" ref="stock.model_stock_location"/>
+        <field name="global" eval="True"/>
+        <field name="domain_force">[(1, '=', 1)] if not user.ferreteria_scope_enforced else ['|', ('usage', '!=', 'internal'), ('id', 'child_of', user.ferreteria_allowed_warehouse_ids.view_location_id.ids)]</field>
+    </record>
+    <record id="rule_stock_quant_scope" model="ir.rule">
+        <field name="name">Ferretería: existencias por almacén permitido</field>
+        <field name="model_id" ref="stock.model_stock_quant"/>
+        <field name="global" eval="True"/>
+        <field name="domain_force">[(1, '=', 1)] if not user.ferreteria_scope_enforced else ['|', ('location_id', 'child_of', user.ferreteria_allowed_warehouse_ids.view_location_id.ids), ('location_id', '=', user.ferreteria_interbranch_transit_location_id.id)]</field>
+    </record>
+    <record id="rule_stock_picking_scope" model="ir.rule">
+        <field name="name">Ferretería: transferencias relacionadas con almacén permitido</field>
+        <field name="model_id" ref="stock.model_stock_picking"/>
+        <field name="global" eval="True"/>
+        <field name="domain_force">[(1, '=', 1)] if not user.ferreteria_scope_enforced else ['|', ('picking_type_id.warehouse_id', 'in', user.ferreteria_allowed_warehouse_ids.ids), '&amp;', ('picking_type_id.warehouse_id', '=', False), ('location_id', 'child_of', user.ferreteria_allowed_warehouse_ids.view_location_id.ids)]</field>
+    </record>
+    <record id="rule_stock_move_scope" model="ir.rule">
+        <field name="name">Ferretería: movimientos relacionados con almacén permitido</field>
+        <field name="model_id" ref="stock.model_stock_move"/>
+        <field name="global" eval="True"/>
+        <field name="domain_force">[(1, '=', 1)] if not user.ferreteria_scope_enforced else ['|', ('picking_type_id.warehouse_id', 'in', user.ferreteria_allowed_warehouse_ids.ids), '&amp;', ('picking_type_id.warehouse_id', '=', False), ('location_id', 'child_of', user.ferreteria_allowed_warehouse_ids.view_location_id.ids)]</field>
+    </record>
+    <record id="rule_stock_move_line_scope" model="ir.rule">
+        <field name="name">Ferretería: líneas de movimiento relacionadas</field>
+        <field name="model_id" ref="stock.model_stock_move_line"/>
+        <field name="global" eval="True"/>
+        <field name="domain_force">[(1, '=', 1)] if not user.ferreteria_scope_enforced else ['|', ('move_id.picking_type_id.warehouse_id', 'in', user.ferreteria_allowed_warehouse_ids.ids), '&amp;', ('move_id.picking_type_id.warehouse_id', '=', False), ('location_id', 'child_of', user.ferreteria_allowed_warehouse_ids.view_location_id.ids)]</field>
+    </record>
+</odoo>
