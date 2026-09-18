@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <template id="report_invoice_purchase_price_precision_ferre" inherit_id="account.report_invoice_document">
+        <xpath expr="//td[@name='td_price_unit']/span[@t-field='line.price_unit']" position="replace">
+            <t t-if="line.move_type in ('in_invoice', 'in_refund', 'in_receipt')">
+                <span class="text-nowrap" t-out="line.ferreteria_format_purchase_price()"/>
+            </t>
+            <t t-else="">
+                <span class="text-nowrap" t-field="line.price_unit"/>
+            </t>
+        </xpath>
+    </template>
+</odoo>
+
