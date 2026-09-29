@@ -1,5 +1,13 @@
 # Changelog
 
+## 18.0.1.1.0 — 2026-09-25
+
+- Añade una instantánea de disponibilidad sin reservar del almacén del POS.
+- Bloquea inmediatamente en el frontend cantidades superiores a esa instantánea.
+- Suma todas las líneas de la misma referencia antes de comparar.
+- Mantiene la validación servidor definitiva y el bloqueo transaccional existentes.
+- Añade pruebas automatizadas de límites, reservas, negativos, duplicados, UDM decimal y devoluciones.
+
 ## 18.0.1.0.1 — 2026-07-21
 
 - Corrige el error de instalación `Many2many fields SaleOrder.transaction_ids ... use the same table and columns`.
