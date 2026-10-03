@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-from odoo import _
+from odoo import _, fields
 
 
 class VlfDashboardPresetRegistry:
@@ -8,7 +8,7 @@ class VlfDashboardPresetRegistry:
     def __init__(self, env):
         self.env = env
 
-    PRESET_VERSION = 2
+    PRESET_VERSION = 3
 
     def _dashboard(self, technical_key, name, description, theme='blue', sequence=10):
         Dashboard = self.env['vlf.dashboard'].sudo()
@@ -110,6 +110,16 @@ class VlfDashboardPresetRegistry:
             ('active', '=', True),
             ('company_ids', 'in', [self.env.company.id]),
         ], order='name', limit=200)
+        facts = self.env['vlf.sales.order.fact'].sudo().search([('date', '!=', False)])
+        years = sorted({record.date.year for record in facts}, reverse=True)
+        if not years:
+            years = [fields.Date.context_today(self.env.user).year]
+        self._ensure_filter(
+            dashboard, 'year', _('Año'), 'date',
+            value_type='selection', sequence=5,
+            option_values='\n'.join(f'{year}:{year}' for year in years),
+            help_text=_('Aplica el año completo a todas las métricas de este dashboard.'),
+        )
         self._ensure_filter(
             dashboard, 'sucursal', _('Sucursal / Almacén'), 'warehouse_id',
             value_type='selection', sequence=10,

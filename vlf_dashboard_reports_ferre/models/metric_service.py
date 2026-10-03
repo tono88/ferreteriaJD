@@ -24,8 +24,17 @@ class VlfDashboardMetricService:
     # Domain helpers
     # -------------------------------------------------------------------------
     def _date_bounds(self, filters, date_only=False):
-        date_from = (filters or {}).get('date_from') or False
-        date_to = (filters or {}).get('date_to') or False
+        raw_year = self._custom(filters, 'year')
+        try:
+            selected_year = int(raw_year) if raw_year else False
+        except (TypeError, ValueError):
+            selected_year = False
+        if selected_year:
+            date_from = f'{selected_year:04d}-01-01'
+            date_to = f'{selected_year:04d}-12-31'
+        else:
+            date_from = (filters or {}).get('date_from') or False
+            date_to = (filters or {}).get('date_to') or False
         try:
             parsed_from = datetime.strptime(str(date_from), '%Y-%m-%d') if date_from else False
             parsed_to = datetime.strptime(str(date_to), '%Y-%m-%d') + timedelta(days=1) if date_to else False
@@ -207,6 +216,39 @@ class VlfDashboardMetricService:
             'values': [pair[1] for pair in selected],
             'rows': [],
             'total': self._fact_sum(domain),
+            'currency': True,
+            'drill_model': 'vlf.sales.order.fact',
+        }
+
+    def _sales_by_month(self, filters=None):
+        domain = self._fact_domain(filters)
+        groups = self.env['vlf.sales.order.fact'].read_group(
+            domain,
+            ['amount_net:sum'],
+            ['date:month'],
+            orderby='date asc',
+            lazy=False,
+        )
+        totals = defaultdict(float)
+        for group in groups:
+            month_number = False
+            month_range = (group.get('__range') or {}).get('date:month') or {}
+            try:
+                month_number = fields.Datetime.to_datetime(month_range.get('from')).month
+            except (TypeError, ValueError, AttributeError):
+                month_number = False
+            if month_number:
+                totals[month_number] += float(group.get('amount_net', 0.0) or 0.0)
+        month_labels = [
+            _('Enero'), _('Febrero'), _('Marzo'), _('Abril'), _('Mayo'), _('Junio'),
+            _('Julio'), _('Agosto'), _('Septiembre'), _('Octubre'), _('Noviembre'), _('Diciembre'),
+        ]
+        values = [totals.get(month, 0.0) for month in range(1, 13)]
+        return {
+            'labels': month_labels,
+            'values': values,
+            'rows': [],
+            'total': sum(values),
             'currency': True,
             'drill_model': 'vlf.sales.order.fact',
         }
@@ -412,7 +454,7 @@ class VlfDashboardMetricService:
             domain = self._fact_domain(filters, channel='pos', movement_type='refund')
             return self._currency_payload(self._fact_sum(domain, 'amount_refund'))
         if metric_key == 'sales.by_month':
-            return self._group_fact(self._fact_domain(filters), 'date:month', limit=limit)
+            return self._sales_by_month(filters)
         if metric_key == 'sales.by_warehouse':
             return self._group_fact(self._fact_domain(filters), 'warehouse_id', limit=limit)
         if metric_key == 'sales.by_channel':

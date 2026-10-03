@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="movement_history_export_wizard_form" model="ir.ui.view">
+        <field name="name">ferreteria.movement.history.export.wizard.form</field>
+        <field name="model">ferreteria.movement.history.export.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Exportar historial de movimientos">
+                <group>
+                    <group>
+                        <field name="date_from"/>
+                        <field name="date_to"/>
+                    </group>
+                    <group>
+                        <field name="warehouse_ids" widget="many2many_tags"/>
+                        <field name="product_ids" widget="many2many_tags"/>
+                    </group>
+                </group>
+                <footer>
+                    <button name="action_export_xlsx" type="object" string="Exportar XLSX" class="btn-primary"/>
+                    <button string="Cancelar" special="cancel" class="btn-secondary"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_movement_history_export_wizard" model="ir.actions.act_window">
+        <field name="name">Historial de movimientos XLSX</field>
+        <field name="res_model">ferreteria.movement.history.export.wizard</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+    </record>
+
+    <menuitem id="menu_movement_history_export_wizard"
+              name="Historial de movimientos XLSX"
+              parent="stock.menu_warehouse_report"
+              action="action_movement_history_export_wizard"
+              sequence="205"
+              groups="stock.group_stock_user"/>
+</odoo>

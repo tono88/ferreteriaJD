@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="inventory_profitability_wizard_form" model="ir.ui.view">
+        <field name="name">ferreteria.inventory.profitability.wizard.form</field>
+        <field name="model">ferreteria.inventory.profitability.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Existencias y Rentabilidad">
+                <sheet>
+                    <group>
+                        <group>
+                            <field name="warehouse_ids" widget="many2many_tags"/>
+                            <field name="location_ids" widget="many2many_tags"/>
+                            <field name="include_zero"/>
+                        </group>
+                        <group>
+                            <field name="product_ids" widget="many2many_tags"/>
+                            <field name="default_code"/>
+                            <field name="category_ids" widget="many2many_tags"/>
+                        </group>
+                    </group>
+                    <group string="Totales" invisible="not line_ids">
+                        <field name="currency_id" invisible="1"/>
+                        <field name="company_id" invisible="1"/>
+                        <field name="total_quantity"/>
+                        <field name="total_inventory_cost"/>
+                        <field name="total_sale_value"/>
+                        <field name="known_cost_sale_value"/>
+                        <field name="total_potential_profit"/>
+                        <field name="consolidated_margin"/>
+                        <field name="cost_coverage_percent"/>
+                    </group>
+                    <field name="line_ids" nolabel="1" readonly="1">
+                        <list create="0" edit="0" delete="0">
+                            <field name="reference"/>
+                            <field name="product_id"/>
+                            <field name="category_id" optional="show"/>
+                            <field name="warehouse_id"/>
+                            <field name="location_id"/>
+                            <field name="quantity" sum="Existencia total"/>
+                            <field name="uom_id"/>
+                            <field name="last_supplier_id"/>
+                            <field name="last_receipt_date"/>
+                            <field name="last_purchase_cost" optional="show"/>
+                            <field name="cost_status" optional="show"/>
+                            <field name="inventory_cost_total" sum="Costo total conocido"/>
+                            <field name="sale_price"/>
+                            <field name="unit_profit"/>
+                            <field name="margin_percent"/>
+                            <field name="sale_value_total" sum="Venta potencial"/>
+                            <field name="potential_profit" sum="Utilidad potencial conocida"/>
+                            <field name="currency_id" column_invisible="True"/>
+                            <field name="has_purchase_history" column_invisible="True"/>
+                        </list>
+                    </field>
+                </sheet>
+                <footer>
+                    <button name="action_compute" type="object" string="Consultar" class="btn-primary"/>
+                    <button name="action_export_xlsx" type="object" string="Exportar XLSX" class="btn-secondary"/>
+                    <button string="Cerrar" special="cancel" class="btn-secondary"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_inventory_profitability_wizard" model="ir.actions.act_window">
+        <field name="name">Existencias y Rentabilidad</field>
+        <field name="res_model">ferreteria.inventory.profitability.wizard</field>
+        <field name="view_mode">form</field>
+        <field name="target">current</field>
+    </record>
+
+    <menuitem id="menu_inventory_profitability_wizard"
+              name="Existencias y Rentabilidad"
+              parent="stock.menu_warehouse_report"
+              action="action_inventory_profitability_wizard"
+              sequence="210"
+              groups="stock.group_stock_user"/>
+</odoo>

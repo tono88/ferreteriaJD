@@ -1,5 +1,11 @@
 # Changelog
 
+## 18.0.1.1.0
+
+- Agrega un selector dinámico de año a los dashboards de ventas y ejecutivo.
+- Completa siempre los doce meses, incluidos los meses con venta cero.
+- Aplica el año seleccionado a todas las métricas para mantener coherencia de totales.
+
 ## 18.0.1.0.4
 
 - Corrige el filtro de sucursal en tarjetas basadas en `pos.order.line`.

@@ -1,5 +1,10 @@
 # Tecnodyne Dashboard Pro para Odoo 18
 
+## 18.0.2.3.2
+
+- Conserva en el cliente los filtros normalizados por el servidor.
+- Refleja correctamente el valor seleccionado en filtros de tipo selección.
+
 Módulo original de dashboards operativos para Odoo 18.
 
 Incluye:

@@ -186,6 +186,10 @@ class VlfDashboardClientAction extends Component {
         this.state.catalog = payload.catalog || [];
         this.state.dashboard = payload.dashboard || {};
         this.state.items = payload.items || [];
+        this.state.filters = payload.filters || this.state.filters;
+        if (!this.state.filters.custom) {
+            this.state.filters.custom = {};
+        }
         this.state.selectedDashboardId = this.state.dashboard.id || false;
         this.state.loading = false;
         this.resetTimer();
