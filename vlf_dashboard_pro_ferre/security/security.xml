@@ -16,9 +16,13 @@
         <field name="implied_ids" eval="[(4, ref('vlf_dashboard_pro_ferre.group_vlf_dashboard_user'))]"/>
     </record>
 
-    <record id="base.group_user" model="res.groups">
-        <field name="implied_ids" eval="[(4, ref('vlf_dashboard_pro_ferre.group_vlf_dashboard_user'))]"/>
-    </record>
+    <!-- Use an explicit write instead of updating the external record.  The
+         base.group_user XML id is protected by noupdate in base data, so a
+         normal <record> update can be skipped during module upgrades. -->
+    <function model="res.groups" name="write">
+        <value eval="[ref('base.group_user')]"/>
+        <value eval="{'implied_ids': [(3, ref('vlf_dashboard_pro_ferre.group_vlf_dashboard_user'))]}"/>
+    </function>
 
     <record id="base.group_system" model="res.groups">
         <field name="implied_ids" eval="[(4, ref('vlf_dashboard_pro_ferre.group_vlf_dashboard_manager'))]"/>

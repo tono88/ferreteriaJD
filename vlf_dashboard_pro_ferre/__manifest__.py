@@ -13,7 +13,7 @@ auto-refresco, exportación, importación, drag and drop y dashboards predefinid
 No incluye funciones de IA. La IA queda preparada como una mejora posterior.
 No copia ni reutiliza código de módulos comerciales de terceros.
     ''',
-    'version': '18.0.2.3.0',
+    'version': '18.0.2.3.1',
     'category': 'Productivity/Reporting',
     'author': 'Tecnodyne / ChatGPT',
     'website': '',
