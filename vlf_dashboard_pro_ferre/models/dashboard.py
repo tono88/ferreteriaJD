@@ -175,7 +175,16 @@ class VlfDashboard(models.Model):
 
     def _dashboard_model_names(self):
         self.ensure_one()
-        return set(self.item_ids.filtered(lambda item: item.active and item.model_id).mapped('model_id.model'))
+        # ir.model metadata is restricted to technical administrators in Odoo.
+        # Dashboard managers only need the model names to build filter
+        # suggestions; business records continue to be queried with the real
+        # user's permissions.
+        dashboard = self.sudo()
+        return set(
+            dashboard.item_ids.filtered(
+                lambda item: item.active and item.model_id
+            ).mapped('model_id.model')
+        )
 
     def _suggested_filter_definitions(self):
         """Central catalog of quick filters that can be added from the dashboard UI.

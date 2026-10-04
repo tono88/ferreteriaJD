@@ -46,7 +46,7 @@
                             <select class="vlf-select" t-att-value="customFilterValue(cfilter.key)" t-on-change="(ev) => this.onCustomFilterChange(ev, cfilter.key, cfilter.value_type)">
                                 <option value="">Todos</option>
                                 <t t-foreach="cfilter.options || []" t-as="opt" t-key="opt.value">
-                                    <option t-att-value="opt.value" t-att-selected="customFilterValue(cfilter.key) === String(opt.value)"><t t-esc="opt.label"/></option>
+                                    <option t-att-value="opt.value" t-att-selected="customFilterValue(cfilter.key) === opt.value"><t t-esc="opt.label"/></option>
                                 </t>
                             </select>
                         </t>

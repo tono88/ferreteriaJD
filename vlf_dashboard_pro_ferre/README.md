@@ -1,5 +1,13 @@
 # Tecnodyne Dashboard Pro para Odoo 18
 
+## 18.0.2.3.3
+
+- Corrige el renderizado OWL de filtros de selección evitando el uso de
+  `String(...)` dentro del template QWeb.
+- Conserva la selección de filtros normalizados por el servidor.
+- Permite a administradores funcionales del Dashboard calcular sugerencias de
+  filtros sin concederles acceso técnico general a `ir.model`.
+
 ## 18.0.2.3.2
 
 - Conserva en el cliente los filtros normalizados por el servidor.
