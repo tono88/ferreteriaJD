@@ -1,6 +1,6 @@
 {
     "name": "Ferretería - Existencias y Rentabilidad",
-    "version": "18.0.1.0.1",
+    "version": "18.0.1.0.2",
     "summary": "Existencias, última compra, costo y rentabilidad por ubicación",
     "category": "Inventory/Reporting",
     "author": "DISTRIBUIDORA Y FERRETERÍA JB",
