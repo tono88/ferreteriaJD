@@ -273,7 +273,7 @@ class AccountInvoice(models.Model):
             data = f'<?xml version="1.0" encoding="UTF-8"?><SolicitaTokenRequest><usuario>{factura.journal_id.usuario_fel}</usuario><apikey>{factura.journal_id.clave_fel}</apikey></SolicitaTokenRequest>'
             r = requests.post(f'https://{request_url}.ifacere-fel.com/{request_path}api/solicitarToken',
                               data=data.encode('utf-8'), headers=headers, timeout=(5, 30))
-            resultadoXML = etree.XML(r.text.encode('utf-8'))
+            resultadoXML = etree.XML(r.content)
             if not resultadoXML.xpath("//token"):
                 raise UserError(r.text)
             token = resultadoXML.xpath("//token")[0].text
@@ -286,7 +286,7 @@ class AccountInvoice(models.Model):
                 vdata = f'<?xml version="1.0" encoding="UTF-8"?><VerificaDocumentoRequest id="{uuid_req}"/>'
                 rv = requests.post(f'https://{request_url}.ifacere-fel.com/{request_path}api/verificarDocumento',
                                    data=vdata.encode('utf-8'), headers=headers, timeout=(5, 12))
-                vxml = etree.XML(rv.text.encode('utf-8'))
+                vxml = etree.XML(rv.content)
                 vnode = vxml.xpath("//xml_dte")
                 if vnode:
                     self._fel_store_certified_xml(factura, vnode[0].text)
@@ -302,7 +302,7 @@ class AccountInvoice(models.Model):
             data = f'<?xml version="1.0" encoding="UTF-8"?><FirmaDocumentoRequest id="{uuid_req}"><xml_dte><![CDATA[{xml_sin_firma}]]></xml_dte></FirmaDocumentoRequest>'
             r = requests.post(f'https://{request_url_firma}api.soluciones-mega.com/api/solicitaFirma',
                               data=data.encode('utf-8'), headers=headers, timeout=(5, 30))
-            resultadoXML = etree.XML(r.text.encode('utf-8'))
+            resultadoXML = etree.XML(r.content)
             if not resultadoXML.xpath("//xml_dte"):
                 raise UserError(r.text)
             xml_con_firma = resultadoXML.xpath("//xml_dte")[0].text
@@ -318,7 +318,7 @@ class AccountInvoice(models.Model):
             data = f'<?xml version="1.0" encoding="UTF-8"?><RegistraDocumentoRequest id="{uuid_req}"><xml_dte><![CDATA[{xml_con_firma}]]></xml_dte></RegistraDocumentoRequest>'
             r = requests.post(f'https://{request_url}.ifacere-fel.com/{request_path}api/registrarDocumentoUuid',
                               data=data.encode('utf-8'), headers=headers, timeout=(5, 30))
-            resultadoXML = etree.XML(r.text.encode('utf-8'))
+            resultadoXML = etree.XML(r.content)
 
             # Guarda respuesta cruda (trazabilidad)
             if hasattr(factura, 'resultado_xml_fel'):
@@ -341,7 +341,7 @@ class AccountInvoice(models.Model):
                     vreq = f'<?xml version="1.0" encoding="UTF-8"?><VerificaDocumentoRequest id="{uuid_req}"/>'
                     rv = requests.post(f'https://{request_url}.ifacere-fel.com/{request_path}api/verificarDocumento',
                                        data=vreq.encode('utf-8'), headers=headers, timeout=(5, 12))
-                    vxml = etree.XML(rv.text.encode('utf-8'))
+                    vxml = etree.XML(rv.content)
 
                     # persistir temprano el uuid si vino sin xml_dte
                     uuid_dte = (vxml.findtext(".//uuid") or "").strip()
@@ -362,7 +362,7 @@ class AccountInvoice(models.Model):
                         rx = f'<?xml version="1.0" encoding="UTF-8"?><RetornaXMLRequest><uuid>{uuid_dte}</uuid></RetornaXMLRequest>'
                         rr = requests.post(f'https://{request_url}.ifacere-fel.com/{request_path}api/retornarXML',
                                            data=rx.encode('utf-8'), headers=headers, timeout=(5, 15))
-                        vxml2 = etree.XML(rr.text.encode('utf-8'))
+                        vxml2 = etree.XML(rr.content)
                         if vxml2.xpath("//xml_dte"):
                             xml_certificado = vxml2.xpath("//xml_dte")[0].text
                             break
@@ -448,7 +448,7 @@ class AccountInvoice(models.Model):
                         factura.journal_id.usuario_fel, factura.journal_id.clave_fel)
                     r = requests.post('https://' + request_url + '.ifacere-fel.com/' + request_path + 'api/solicitarToken',
                                       data=data.encode('utf-8'), timeout=(5, 30), headers=headers)
-                    resultadoXML = etree.XML(bytes(r.text, encoding='utf-8'))
+                    resultadoXML = etree.XML(r.content)
 
                     if len(resultadoXML.xpath("//token")) > 0:
                         token = resultadoXML.xpath("//token")[0].text
@@ -461,7 +461,7 @@ class AccountInvoice(models.Model):
                             vdata = '<?xml version="1.0" encoding="UTF-8"?><VerificaDocumentoRequest id="{}"/>'.format(uuid_factura)
                             rv = requests.post('https://' + request_url + '.ifacere-fel.com/' + request_path + 'api/verificarDocumento',
                                                data=vdata.encode('utf-8'), headers=headers, timeout=(5, 15))
-                            vxml = etree.XML(rv.text.encode('utf-8'))
+                            vxml = etree.XML(rv.content)
                             vnode = vxml.xpath("//xml_dte")
                             if vnode:
                                 xml_certificado = vnode[0].text
@@ -480,7 +480,7 @@ class AccountInvoice(models.Model):
                         r = requests.post('https://' + request_url_firma + 'api.soluciones-mega.com/api/solicitaFirma',
                                           data=data.encode('utf-8'), timeout=(5, 30), headers=headers)
                         _logger.warning(r.text)
-                        resultadoXML = etree.XML(bytes(r.text, encoding='utf-8'))
+                        resultadoXML = etree.XML(r.content)
                         if len(resultadoXML.xpath("//xml_dte")) > 0:
                             xml_con_firma = html.unescape(resultadoXML.xpath("//xml_dte")[0].text)
 
@@ -490,7 +490,7 @@ class AccountInvoice(models.Model):
                             _logger.warning(data)
                             r = requests.post('https://' + request_url + '.ifacere-fel.com/' + request_path + 'api/anularDocumentoXML',
                                               data=data.encode('utf-8'), timeout=(5, 30), headers=headers)
-                            resultadoXML = etree.XML(bytes(r.text, encoding='utf-8'))
+                            resultadoXML = etree.XML(r.content)
 
                             if len(resultadoXML.xpath("//listado_errores")) > 0:
                                 raise UserError(r.text)

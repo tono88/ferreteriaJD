@@ -13,7 +13,6 @@ from odoo.exceptions import UserError
 from odoo.addons.fel_megaprint_annul_patch_ferre.models.account_move import (
     _env_is_test,
     _get_creds,
-    _request_token,
     _retornar_pdf_v2,
     _save_pdf_on_move,
     _to_draft_then_cancel,
@@ -134,86 +133,197 @@ class AccountMove(models.Model):
         seed = "account.move:%s:fel:annul:%s" % (self.id, self.firma_fel or "")
         return str(uuid.uuid5(uuid.NAMESPACE_OID, seed)).upper()
 
+    @staticmethod
+    def _ferreteria_xml_response(response, stage):
+        """Parse the original HTTP bytes to preserve UTF-8 exactly."""
+        try:
+            response.raise_for_status()
+            return etree.fromstring(response.content)
+        except requests.RequestException as exc:
+            raise UserError(
+                _("Error HTTP durante %s (HTTP %s).")
+                % (stage, response.status_code or 0)
+            ) from exc
+        except etree.XMLSyntaxError as exc:
+            raise UserError(
+                _("Respuesta XML inválida durante %s (HTTP %s).")
+                % (stage, response.status_code or 0)
+            ) from exc
+
+    @staticmethod
+    def _ferreteria_response_details(root):
+        codes = []
+        descriptions = []
+        for node in root.xpath("//*[local-name()='cod_error']"):
+            value = (node.text or "").strip()
+            if value and value not in codes:
+                codes.append(value)
+        for node in root.xpath("//*[local-name()='desc_error']"):
+            value = (node.text or "").strip()
+            if value and value not in descriptions:
+                descriptions.append(value)
+        response_type = root.xpath(
+            "string(//*[local-name()='tipo_respuesta'][1])"
+        ).strip()
+        return codes, descriptions, response_type
+
+    @staticmethod
+    def _ferreteria_inner_xml(node):
+        return html.unescape((node.text or "").strip())
+
     def action_annul_fel_megaprint(self):
-        """Submit the annulment with an operation-specific request identifier."""
+        """Submit one UTF-8-safe annulment and mark it only after acceptance."""
         for move in self:
-            if not move.requiere_certificacion():
-                raise UserError(_("Este documento no requiere certificación FEL."))
             if not move.firma_fel:
-                raise UserError(_("La factura no posee firma FEL; no se puede anular."))
+                raise UserError(_("La factura no posee autorización FEL para anular."))
+            if move.fel_annulled:
+                raise UserError(_("El DTE ya está marcado como anulado en Odoo."))
+            if (
+                not move.motivo_fel
+                or not move.motivo_fel.strip()
+                or move.motivo_fel.strip() == "-"
+            ):
+                raise UserError(_("Indique un motivo real para la anulación FEL."))
 
             usuario, apikey, modo = _get_creds(move)
             is_test = _env_is_test(move, modo)
             api_host = "dev2.api.ifacere-fel.com" if is_test else "apiv2.ifacere-fel.com"
-            firma_host = ("dev." if is_test else "") + "api.soluciones-mega.com"
-            token, _token_url, _token_response = _request_token(api_host, usuario, apikey)
+            sign_host = ("dev." if is_test else "") + "api.soluciones-mega.com"
+            headers = {"Content-Type": "application/xml", "Accept": "application/xml"}
 
-            xml_sin_firma = etree.tostring(
-                move.dte_anulacion(), encoding="UTF-8"
-            ).decode("utf-8")
-            headers = {
-                "Content-Type": "application/xml",
-                "authorization": "Bearer " + token,
-                "Accept": "application/xml",
-            }
+            token_root = etree.Element("SolicitaTokenRequest")
+            etree.SubElement(token_root, "usuario").text = usuario
+            etree.SubElement(token_root, "apikey").text = apikey
+            token_response = requests.post(
+                "https://%s/api/solicitarToken" % api_host,
+                data=etree.tostring(token_root, encoding="UTF-8", xml_declaration=True),
+                headers=headers,
+                timeout=60,
+            )
+            token_xml = move._ferreteria_xml_response(
+                token_response, "autenticación FEL"
+            )
+            token = token_xml.xpath("string(//*[local-name()='token'][1])").strip()
+            if not token:
+                codes, descriptions, _response_type = (
+                    move._ferreteria_response_details(token_xml)
+                )
+                raise UserError(
+                    _("MegaPrint rechazó la autenticación FEL: %s %s")
+                    % (
+                        ", ".join(codes) or "SIN_CODIGO",
+                        "; ".join(descriptions) or "",
+                    )
+                )
+
+            auth_headers = dict(headers, authorization="Bearer " + token)
             request_id = move._ferreteria_fel_annul_request_id()
-            sign_payload = (
-                '<?xml version="1.0" encoding="UTF-8"?>'
-                '<FirmaDocumentoRequest id="{rid}"><xml_dte><![CDATA[{xml}]]>'
-                '</xml_dte></FirmaDocumentoRequest>'
-            ).format(rid=request_id, xml=xml_sin_firma)
-            response = requests.post(
-                "https://%s/api/solicitaFirma" % firma_host,
-                data=sign_payload.encode("utf-8"), headers=headers, timeout=60,
-            )
-            try:
-                sign_xml = etree.XML((response.text or "").encode("utf-8"))
-            except Exception as exc:
-                raise UserError(_("Respuesta inválida al firmar la anulación.")) from exc
-            signed_nodes = sign_xml.xpath("//*[local-name()='xml_dte']")
-            if not signed_nodes or not signed_nodes[0].text:
-                raise UserError(_("Megaprint no devolvió el XML de anulación firmado."))
-            xml_firmado = html.unescape(signed_nodes[0].text)
+            unsigned_xml = etree.tostring(move.dte_anulacion(), encoding="UTF-8")
 
-            annul_payload = (
-                '<?xml version="1.0" encoding="UTF-8"?>'
-                '<AnulaDocumentoXMLRequest id="{rid}"><xml_dte><![CDATA[{xml}]]>'
-                '</xml_dte></AnulaDocumentoXMLRequest>'
-            ).format(rid=request_id, xml=xml_firmado)
-            response = requests.post(
-                "https://%s/api/anularDocumentoXML" % api_host,
-                data=annul_payload.encode("utf-8"), headers=headers, timeout=60,
+            sign_root = etree.Element("FirmaDocumentoRequest", id=request_id)
+            etree.SubElement(sign_root, "xml_dte").text = etree.CDATA(
+                unsigned_xml.decode("utf-8")
             )
-            try:
-                annul_xml = etree.XML((response.text or "").encode("utf-8"))
-            except Exception as exc:
-                raise UserError(_("Respuesta inválida al enviar la anulación.")) from exc
-            if annul_xml.xpath("//*[local-name()='listado_errores']"):
-                raise UserError(_("Megaprint devolvió errores al anular el DTE."))
+            sign_response = requests.post(
+                "https://%s/api/solicitaFirma" % sign_host,
+                data=etree.tostring(sign_root, encoding="UTF-8", xml_declaration=True),
+                headers=auth_headers,
+                timeout=60,
+            )
+            sign_xml = move._ferreteria_xml_response(
+                sign_response, "firma de anulación FEL"
+            )
+            signed_nodes = sign_xml.xpath("//*[local-name()='xml_dte']")
+            if not signed_nodes or not (signed_nodes[0].text or "").strip():
+                codes, descriptions, _response_type = (
+                    move._ferreteria_response_details(sign_xml)
+                )
+                raise UserError(
+                    _("MegaPrint rechazó la firma de anulación: %s %s")
+                    % (
+                        ", ".join(codes) or "SIN_CODIGO",
+                        "; ".join(descriptions) or "",
+                    )
+                )
+            signed_xml = move._ferreteria_inner_xml(signed_nodes[0])
+
+            annul_root = etree.Element("AnulaDocumentoXMLRequest", id=request_id)
+            etree.SubElement(annul_root, "xml_dte").text = etree.CDATA(signed_xml)
+            annul_response = requests.post(
+                "https://%s/api/anularDocumentoXML" % api_host,
+                data=etree.tostring(annul_root, encoding="UTF-8", xml_declaration=True),
+                headers=auth_headers,
+                timeout=60,
+            )
+            annul_xml = move._ferreteria_xml_response(
+                annul_response, "anulación FEL"
+            )
+            codes, descriptions, response_type = move._ferreteria_response_details(
+                annul_xml
+            )
+            if annul_xml.xpath("//*[local-name()='listado_errores']") or response_type == "1":
+                raise UserError(
+                    _("MegaPrint rechazó la anulación: %s %s")
+                    % (
+                        ", ".join(codes) or "SIN_CODIGO",
+                        "; ".join(descriptions) or "",
+                    )
+                )
 
             original_uuid = move.firma_fel
-            annul_uuid_nodes = annul_xml.xpath("//*[local-name()='uuid']")
-            annul_uuid = (
-                annul_uuid_nodes and (annul_uuid_nodes[0].text or "").strip()
-            ) or False
-            pdf_bytes = None
-            try:
-                if original_uuid:
-                    pdf_bytes = _retornar_pdf_v2(api_host, token, original_uuid)
-                if not pdf_bytes and annul_uuid:
-                    pdf_bytes = _retornar_pdf_v2(
-                        api_host, token, annul_uuid, xml_firmado
-                    )
-            except Exception:
-                pdf_bytes = None
-            _save_pdf_on_move(
-                move, pdf_bytes,
-                "fel_anulacion_%s.pdf" % (original_uuid or annul_uuid or "doc"),
-            )
-            if not _to_draft_then_cancel(move):
-                raise UserError(_(
-                    "FEL anulado en Megaprint, pero no fue posible cancelar la factura en Odoo."
-                ))
+            annul_uuid = annul_xml.xpath(
+                "string(//*[local-name()='uuid'][1])"
+            ).strip()
+
+            attachment_model = self.env["ir.attachment"].sudo()
+            attachment_model.create({
+                "name": "fel_anulacion_firmada_%s.xml" % original_uuid,
+                "datas": base64.b64encode(signed_xml.encode("utf-8")),
+                "res_model": "account.move",
+                "res_id": move.id,
+                "mimetype": "application/xml",
+            })
+            attachment_model.create({
+                "name": "fel_anulacion_respuesta_%s.xml" % original_uuid,
+                "datas": base64.b64encode(annul_response.content),
+                "res_model": "account.move",
+                "res_id": move.id,
+                "mimetype": "application/xml",
+            })
+
+            # The remote annulment is irreversible once accepted. Persist the
+            # accepted state before optional PDF/local cancellation work. Tests
+            # can suppress the safety commit to keep fixtures transactional.
             move.write({"fel_annulled": True})
-            move.message_post(body=_("FEL anulado correctamente en Megaprint QA."))
+            move.message_post(body=_(
+                "MegaPrint aceptó la anulación FEL. UUID de anulación: %s."
+            ) % (annul_uuid or "no informado"))
+            if not self.env.context.get("fel_skip_safety_commit"):
+                self.env.cr.commit()
+
+            saved_pdf = False
+            try:
+                pdf_bytes = _retornar_pdf_v2(
+                    api_host, token, annul_uuid or original_uuid, signed_xml
+                )
+                saved_pdf = _save_pdf_on_move(
+                    move,
+                    pdf_bytes,
+                    "fel_anulacion_%s.pdf" % (annul_uuid or original_uuid),
+                )
+            except Exception:
+                saved_pdf = False
+
+            locally_cancelled = _to_draft_then_cancel(move)
+            if not locally_cancelled:
+                move.message_post(body=_(
+                    "El DTE fue anulado en MegaPrint, pero la factura no pudo cancelarse localmente."
+                ))
+            move.message_post(body=_(
+                "FEL anulado correctamente en MegaPrint. UUID de anulación: %s. %s %s"
+            ) % (
+                annul_uuid or "no informado",
+                "PDF actualizado." if saved_pdf else "PDF no actualizado automáticamente.",
+                "Factura cancelada en Odoo." if locally_cancelled else "Cancelación local pendiente.",
+            ))
         return True

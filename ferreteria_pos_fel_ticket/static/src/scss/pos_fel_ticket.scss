@@ -30,6 +30,15 @@
         text-align: center;
     }
 
+    .ferreteria-ticket-status {
+        border: 1px solid #000;
+        font-weight: 700;
+        margin: 0.25rem auto;
+        padding: 0.15rem 0.25rem;
+        text-align: center;
+        width: fit-content;
+    }
+
     .ferreteria-fel-break {
         overflow-wrap: anywhere;
         word-break: break-word;
@@ -45,5 +54,69 @@
 
     .ferreteria-fel-preline {
         white-space: pre-line;
+    }
+
+    .ferreteria-required-legends {
+        font-size: 0.88em;
+        font-weight: 700;
+        line-height: 1.3;
+    }
+
+    .ferreteria-ticket-lines {
+        border-top: 1px dashed #000;
+        border-bottom: 1px dashed #000;
+        margin: 0.35rem 0;
+        padding: 0.15rem 0;
+    }
+
+    .ferreteria-ticket-line {
+        padding: 0.25rem 0;
+    }
+
+    .ferreteria-ticket-line + .ferreteria-ticket-line {
+        border-top: 1px dotted #777;
+    }
+
+    .ferreteria-ticket-line-name {
+        font-weight: 700;
+        overflow-wrap: anywhere;
+        word-break: normal;
+    }
+
+    .ferreteria-ticket-line-values {
+        display: flex;
+        gap: 0.35rem;
+        justify-content: space-between;
+        width: 100%;
+    }
+
+    .ferreteria-ticket-line-calculation,
+    .ferreteria-ticket-line-subtotal {
+        white-space: nowrap;
+    }
+
+    .ferreteria-ticket-line-subtotal {
+        font-weight: 700;
+        margin-left: auto;
+        text-align: right;
+    }
+
+    .ferreteria-ticket-line-discount {
+        font-size: 0.88em;
+        font-weight: 700;
+    }
+
+    .ferreteria-ticket-line-note {
+        font-size: 0.88em;
+        overflow-wrap: anywhere;
+    }
+}
+
+@media print {
+    .pos-receipt {
+        box-sizing: border-box;
+        max-width: 74mm;
+        overflow: hidden;
+        width: 74mm;
     }
 }

@@ -124,80 +124,107 @@ class PosOrder(models.Model):
         partner = self.partner_id.sudo()
         xml_data = self._extract_fel_xml_data(move) if move else {}
 
-        if not move:
-            return {
-                "enabled": False,
-                "status": "not_invoiced",
-                "certified": False,
-                "message": _("La orden no tiene una factura vinculada."),
-                "internal_correlative": self.internal_correlative or "",
-                "order_reference": self.pos_reference or self.name or "",
-            }
-
-        authorization = xml_data.get("authorization") or self._first_field_value(
-            move, self._FEL_FIELD_CANDIDATES["authorization"]
+        is_fel = bool(move)
+        authorization = (
+            xml_data.get("authorization")
+            or self._first_field_value(move, self._FEL_FIELD_CANDIDATES["authorization"])
+            if move
+            else False
         )
-        series = xml_data.get("series") or self._first_field_value(
-            move, self._FEL_FIELD_CANDIDATES["series"]
+        series = (
+            xml_data.get("series")
+            or self._first_field_value(move, self._FEL_FIELD_CANDIDATES["series"])
+            if move
+            else False
         )
-        number = xml_data.get("number") or self._first_field_value(
-            move, self._FEL_FIELD_CANDIDATES["number"]
+        number = (
+            xml_data.get("number")
+            or self._first_field_value(move, self._FEL_FIELD_CANDIDATES["number"])
+            if move
+            else False
         )
-        certification_datetime = xml_data.get("certification_datetime") or self._first_field_value(
-            move, self._FEL_FIELD_CANDIDATES["certification_datetime"]
+        certification_datetime = (
+            xml_data.get("certification_datetime")
+            or self._first_field_value(move, self._FEL_FIELD_CANDIDATES["certification_datetime"])
+            if move
+            else False
         )
-        certifier_name = xml_data.get("certifier_name") or self._first_field_value(
-            move, self._FEL_FIELD_CANDIDATES["certifier"]
+        certifier_name = (
+            xml_data.get("certifier_name")
+            or self._first_field_value(move, self._FEL_FIELD_CANDIDATES["certifier"])
+            if move
+            else False
         )
-        certifier_vat = xml_data.get("certifier_vat") or self._first_field_value(
-            move, self._FEL_FIELD_CANDIDATES["certifier_vat"]
+        certifier_vat = (
+            xml_data.get("certifier_vat")
+            or self._first_field_value(move, self._FEL_FIELD_CANDIDATES["certifier_vat"])
+            if move
+            else False
         )
 
         # The current project uses Megaprint.  These values are only fallbacks;
         # XML or explicit invoice fields always take precedence.
-        certifier_name = certifier_name or "MEGAPRINT, S.A."
-        certifier_vat = certifier_vat or "50510231"
+        if is_fel:
+            certifier_name = certifier_name or "MEGAPRINT, S.A."
+            certifier_vat = certifier_vat or "50510231"
 
-        qr_image_src, qr_value = self._get_qr_data(move)
+        qr_image_src, qr_value = self._get_qr_data(move) if move else ("", "")
         issue_datetime = (
             xml_data.get("issue_datetime")
             or self._format_datetime_value(self.date_order)
-            or self._format_datetime_value(move.invoice_date)
+            or (self._format_datetime_value(move.invoice_date) if move else "")
         )
         certification_datetime = self._format_datetime_value(certification_datetime)
 
         emitter_name = xml_data.get("emitter_name") or company.name or ""
-        commercial_name = (
-            xml_data.get("commercial_name")
-            or self.config_id.name
-            or emitter_name
-        )
+        branch_identity = self._get_branch_receipt_identity(move, xml_data)
+        commercial_name = branch_identity["commercial_name"]
         emitter_vat = xml_data.get("emitter_vat") or company.vat or ""
-        emitter_address = (
-            xml_data.get("emitter_address")
-            or self._get_establishment_address(move)
-            or self._record_address(company.partner_id)
-        )
+        emitter_address = branch_identity["address"]
+        emitter_phone = branch_identity["phone"]
 
         customer_name = xml_data.get("customer_name") or partner.name or _("Consumidor Final")
         customer_vat = xml_data.get("customer_vat") or partner.vat or "CF"
         customer_address = xml_data.get("customer_address") or self._record_address(partner) or ""
 
-        document_type_label = self._get_document_type_label(move, xml_data.get("document_type"))
+        document_type_code = self._get_document_type_code(move, xml_data.get("document_type"))
+        document_type_label = self._get_document_type_label(move, document_type_code) if move else ""
         cashier = self._get_ticket_cashier_name()
-        certified = bool(authorization)
+        certified = bool(is_fel and authorization)
+        internal_correlative = (
+            self.internal_correlative
+            or (move.internal_correlative if move and "internal_correlative" in move._fields else "")
+            or ""
+        )
+        internal_series, internal_number = self._split_internal_correlative(internal_correlative)
 
         ticket_lines = self._get_ticket_lines()
         ticket_payments = self._get_ticket_payments()
+        amount_total = move.amount_total if move else self.amount_total
+        amount_tax = move.amount_tax if move else self.amount_tax
+        amount_untaxed = move.amount_untaxed if move else amount_total - amount_tax
+        status = "certified" if certified else ("pending" if is_fel else "not_invoiced")
+        message = (
+            ""
+            if certified
+            else _("Factura creada; certificación FEL pendiente.")
+            if is_fel
+            else _("COMPROBANTE INTERNO - NO ES DTE CERTIFICADO")
+        )
 
         return {
             "enabled": True,
-            "status": "certified" if certified else "pending",
+            "status": status,
+            "is_fel": is_fel,
             "certified": certified,
-            "message": "" if certified else _("Factura creada; certificación FEL pendiente."),
-            "move_id": move.id,
-            "move_name": move.name or "",
-            "internal_correlative": self.internal_correlative or move.internal_correlative or "",
+            "message": message,
+            "document_status": self._get_ticket_document_status(move, is_fel),
+            "move_id": move.id if move else False,
+            "move_name": move.name or "" if move else "",
+            "internal_correlative": internal_correlative,
+            "internal_series": internal_series,
+            "internal_number": internal_number,
+            "document_type_code": document_type_code,
             "document_type": document_type_label,
             "authorization": self._to_text(authorization),
             "series": self._to_text(series),
@@ -210,6 +237,7 @@ class PosOrder(models.Model):
             "commercial_name": self._to_text(commercial_name),
             "emitter_vat": self._to_text(emitter_vat),
             "emitter_address": self._to_text(emitter_address),
+            "emitter_phone": self._to_text(emitter_phone),
             "customer_name": self._to_text(customer_name),
             "customer_vat": self._to_text(customer_vat),
             "customer_address": self._to_text(customer_address),
@@ -223,19 +251,81 @@ class PosOrder(models.Model):
             "qr_value": qr_value,
             "lines": ticket_lines,
             "payments": ticket_payments,
-            "amount_untaxed": move.amount_untaxed,
-            "amount_tax": move.amount_tax,
-            "amount_total": move.amount_total,
+            "amount_untaxed": amount_untaxed,
+            "amount_tax": amount_tax,
+            "amount_total": amount_total,
             "amount_paid": self.amount_paid,
             "amount_return": self.amount_return,
-            "amount_untaxed_formatted": self._format_amount(move.amount_untaxed),
-            "amount_tax_formatted": self._format_amount(move.amount_tax),
-            "amount_total_formatted": self._format_amount(move.amount_total),
+            "amount_untaxed_formatted": self._format_amount(amount_untaxed),
+            "amount_tax_formatted": self._format_amount(amount_tax),
+            "amount_total_formatted": self._format_amount(amount_total),
             "amount_paid_formatted": self._format_amount(self.amount_paid),
             "amount_return_formatted": self._format_amount(self.amount_return),
             "receipt_header": self._plain_config_text(self.config_id.receipt_header),
             "receipt_footer": self._plain_config_text(self.config_id.receipt_footer),
         }
+
+    def _get_branch_receipt_identity(self, move, xml_data):
+        self.ensure_one()
+        config = self.config_id.sudo()
+        company = self.company_id.sudo()
+        commercial_name = (
+            config.thermal_receipt_commercial_name
+            or xml_data.get("commercial_name")
+            or config.name
+            or xml_data.get("emitter_name")
+            or company.name
+            or ""
+        )
+        # A certified FEL must identify the fiscal establishment that emitted
+        # the DTE.  The POS address remains a fallback for non-FEL receipts.
+        is_certified_fel = bool(move and getattr(move, "firma_fel", False))
+        fel_address = self._get_establishment_address(move) if is_certified_fel else ""
+        address = (
+            fel_address
+            or (xml_data.get("emitter_address") if is_certified_fel else "")
+            or config.thermal_receipt_address
+            or xml_data.get("emitter_address")
+            or (self._get_establishment_address(move) if move else "")
+            or self._record_address(company.partner_id)
+        )
+        phone = config.thermal_receipt_phone or ""
+        return {
+            "commercial_name": commercial_name,
+            "address": address,
+            "phone": phone,
+        }
+
+    def _get_ticket_document_status(self, move, is_fel):
+        self.ensure_one()
+        if move and "fel_annulled" in move._fields and move.fel_annulled:
+            return _("ANULADO")
+        if not is_fel and self.state == "cancel":
+            return _("ANULADA")
+        currency = self.currency_id
+        fully_paid = currency.compare_amounts(
+            self.amount_paid or 0.0, self.amount_total or 0.0
+        ) >= 0
+        return _("PAGADO") if fully_paid else _("PENDIENTE DE PAGO")
+
+    @staticmethod
+    def _split_internal_correlative(value):
+        value = (value or "").strip()
+        if not value:
+            return "", ""
+        if "-" in value:
+            series, number = value.split("-", 1)
+            return series.strip(), number.strip()
+        return "", value
+
+    @staticmethod
+    def _get_document_type_code(move, xml_type=False):
+        code = (xml_type or "").upper()
+        if code:
+            return code
+        if move and move.move_type == "out_refund":
+            return "NCRE"
+        return "FACT" if move else ""
 
     def _get_ticket_cashier_name(self):
         self.ensure_one()
@@ -248,10 +338,16 @@ class PosOrder(models.Model):
         values = []
         for line in self.lines:
             line_total = self._line_total_included(line)
+            product_uom = (
+                line.product_uom_id
+                if "product_uom_id" in line._fields
+                else line.product_id.uom_id
+            )
             values.append({
                 "name": line.full_product_name or line.product_id.display_name or "",
                 "quantity": line.qty,
                 "quantity_display": self._format_quantity(line.qty),
+                "unit_name": product_uom.name or "",
                 "unit_price": line.price_unit,
                 "unit_price_formatted": self._format_amount(line.price_unit),
                 "discount": line.discount or 0.0,

@@ -2,8 +2,10 @@
 
 Módulo enfocado únicamente en impresión:
 
-1. Convierte el recibo final del Punto de Venta en un ticket con datos de la factura FEL vinculada.
-2. Agrega **Imprimir → Ticket FEL térmico** en las órdenes POS del backend.
+1. Convierte el recibo final del Punto de Venta en un ticket térmico de 80 mm para ventas FEL y no FEL.
+2. Agrega **Imprimir → Ticket térmico 80 mm** en las órdenes POS del backend.
+3. Permite configurar nombre comercial, dirección y teléfono por POS.
+4. Muestra por producto la cantidad/unidad, precio unitario, subtotal y descuento cuando corresponde.
 
 No crea facturas, no certifica, no modifica cierres de sesión, no altera devoluciones y no cambia líneas de factura.
 
@@ -28,8 +30,9 @@ El módulo prioriza el XML certificado y esos campos. También reconoce variante
 
 ## Uso
 
-- En el POS, facture la venta y finalícela. La pantalla de recibo consulta la factura vinculada y muestra serie, número, autorización, fechas, emisor, receptor y certificador.
-- En backend: **Punto de venta → Pedidos → Pedidos**, abra o seleccione una orden y use **Imprimir → Ticket FEL térmico**.
+- En el POS, finalice la venta. La impresión consulta la orden del servidor antes de generar el ticket.
+- Una venta FEL muestra los datos reales de certificación. Una venta sin FEL se identifica como comprobante interno y no presenta valores DTE ficticios.
+- En backend: **Punto de venta → Pedidos → Pedidos**, abra o seleccione una orden y use **Imprimir → Ticket térmico 80 mm**.
 
 ## Papel
 

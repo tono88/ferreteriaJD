@@ -2,7 +2,7 @@
 
 {
     'name': 'FEL Megaprint',
-    'version': '18.0.1.2.1',
+    'version': '18.0.1.2.2',
     'category': 'Custom',
     'license': 'LGPL-3',
     'description': """ Integración con factura electrónica de Megaprint """,
