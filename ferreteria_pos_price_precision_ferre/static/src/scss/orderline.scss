@@ -1,0 +1,35 @@
+.ferre-price-precision {
+    .orderline {
+        .price-per-unit,
+        .product-price,
+        .discount-removed {
+            display: none !important;
+        }
+
+        .ferre-price-detail {
+            display: flex !important;
+            min-width: 0;
+        }
+
+        .ferre-price-discount {
+            display: list-item !important;
+        }
+
+        .ferre-price-equation {
+            min-width: 0;
+        }
+
+        .ferre-unit-price,
+        .ferre-line-total {
+            font-variant-numeric: tabular-nums;
+        }
+    }
+}
+
+@media (max-width: 576px) {
+    .ferre-price-precision .orderline .ferre-price-detail {
+        align-items: flex-start !important;
+        flex-wrap: wrap;
+    }
+}
+

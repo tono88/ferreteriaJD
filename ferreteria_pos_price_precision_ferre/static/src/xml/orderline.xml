@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates id="template" xml:space="preserve">
+    <t t-name="ferreteria_pos_price_precision_ferre.OrderSummary"
+       t-inherit="point_of_sale.OrderSummary"
+       t-inherit-mode="extension">
+        <xpath expr="//OrderWidget" position="attributes">
+            <attribute name="class">'bg-light ferre-price-precision'</attribute>
+        </xpath>
+    </t>
+
+    <t t-name="ferreteria_pos_price_precision_ferre.Orderline"
+       t-inherit="point_of_sale.Orderline"
+       t-inherit-mode="extension">
+        <xpath expr="//li[hasclass('price-per-unit')]" position="after">
+            <li class="ferre-price-detail d-none align-items-baseline justify-content-between gap-2 w-100">
+                <span class="ferre-price-equation text-truncate">
+                    <span class="qty px-1 border rounded text-bg-view fw-bolder me-1" t-esc="line.qty"/>
+                    <t t-if="line.unit"><span t-esc="line.unit"/> </t>
+                    <span aria-hidden="true">×</span>
+                    <span class="ferre-unit-price" t-esc="line.ferreUnitPrice"/>
+                </span>
+                <span class="ferre-line-total fw-bolder text-nowrap ms-auto" t-esc="line.ferreLineTotal"/>
+            </li>
+            <li t-if="line.discount and line.discount !== '0'"
+                class="ferre-price-discount d-none text-muted">
+                Descuento: <span t-esc="line.discount"/>%
+            </li>
+        </xpath>
+    </t>
+</templates>
+
