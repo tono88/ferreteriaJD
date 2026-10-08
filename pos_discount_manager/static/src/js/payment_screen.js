@@ -29,7 +29,7 @@ patch(PaymentScreen.prototype, {
         const code = await makeAwaitable(this.dialog, NumberPopup, {
             title: _t("Descuento fuera del límite de %s. Ingrese el código temporal del gerente.", cashier.name),
             confirmButtonLabel: _t("Autorizar"),
-            isValid: (value) => /^\\d{6}$/.test(String(value)),
+            isValid: (value) => /^[0-9]{6}$/.test(String(value)),
         });
         if (!code) {
             return; // Cancelación de diálogo: no se cobra ni se consume código.
