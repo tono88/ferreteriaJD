@@ -1,0 +1,48 @@
+name: Validar módulos POS Odoo 18
+
+on:
+  pull_request:
+    paths:
+      - "pos_discount_manager/**"
+      - "pos_discount_otp_generator/**"
+      - "ferreteria_pos_cotizaciones/**"
+      - ".github/workflows/pos_addons_lint.yml"
+  push:
+    paths:
+      - "pos_discount_manager/**"
+      - "pos_discount_otp_generator/**"
+      - "ferreteria_pos_cotizaciones/**"
+
+jobs:
+  syntax:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Revisar Python XML manifest y referencias
+        run: |
+          python - <<'PY'
+          import ast
+          from pathlib import Path
+          from xml.etree import ElementTree
+          modules = ("pos_discount_manager", "pos_discount_otp_generator", "ferreteria_pos_cotizaciones")
+          for name in modules:
+              root = Path(name)
+              for f in root.rglob("*.py"):
+                  ast.parse(f.read_text(encoding="utf-8"), filename=str(f))
+              for f in root.rglob("*.xml"):
+                  ElementTree.parse(f)
+              manifest = ast.literal_eval((root / "__manifest__.py").read_text(encoding="utf-8"))
+              for data in manifest.get("data", []):
+                  assert (root / data).is_file(), f"No existe {root / data}"
+              for path in manifest.get("assets", {}).get("point_of_sale._assets_pos", []):
+                  assert Path(path).is_file(), f"No existe {path}"
+              print(f"{name}: sintaxis y referencias correctas")
+          PY
+      - name: Revisar JavaScript POS
+        run: |
+          set -eu
+          find pos_discount_manager pos_discount_otp_generator ferreteria_pos_cotizaciones -name '*.js' -print0 |
+            while IFS= read -r -d '' file; do
+              echo "Comprobando $file"
+              node --input-type=module --check < "$file"
+            done
