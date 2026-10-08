@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<odoo>
+    <record id="view_pos_discount_otp_wizard_form" model="ir.ui.view">
+        <field name="name">pos.discount.otp.wizard.form</field>
+        <field name="model">pos.discount.otp.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Generar autorización de descuento">
+                <group>
+                    <field name="employee_id" readonly="generated_code"/>
+                    <field name="config_id" readonly="generated_code"/>
+                    <field name="generated_code" readonly="1" widget="CopyClipboardChar" invisible="not generated_code"/>
+                    <field name="expires_at" readonly="1" invisible="not generated_code"/>
+                </group>
+                <footer>
+                    <button name="action_generate" type="object" string="Generar código" class="btn-primary"/>
+                    <button name="action_send_email" type="object" string="Enviar al correo del cajero" invisible="not generated_code"/>
+                    <button string="Cerrar" special="cancel" class="btn-secondary"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_pos_discount_otp_wizard" model="ir.actions.act_window">
+        <field name="name">Generar autorización de descuento</field>
+        <field name="res_model">pos.discount.otp.wizard</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+    </record>
+    <menuitem id="menu_pos_discount_otp_wizard"
+              name="Códigos para descuentos"
+              parent="point_of_sale.menu_point_of_sale"
+              action="action_pos_discount_otp_wizard"
+              sequence="80"
+              groups="point_of_sale.group_pos_manager"/>
+</odoo>
