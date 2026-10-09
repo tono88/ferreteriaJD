@@ -40,6 +40,9 @@ jobs:
                   assert Path(path).is_file(), f"No existe {path}"
               print(f"{name}: sintaxis y referencias correctas")
           PY
+      - name: Pruebas del límite de descuentos globales y por línea
+        run: node pos_discount_manager/tests/test_discount_guard.cjs
+
       - name: Revisar JavaScript POS
         run: |
           set -eu
