@@ -2,7 +2,7 @@
 
 {
     "name": "Ferretería - Ticket FEL para Punto de Venta",
-    "version": "18.0.2.0.2",
+    "version": "18.0.2.0.4",
     "category": "Point of Sale",
     "summary": "Recibo POS con datos FEL y ticket térmico PDF desde el backend",
     "author": "Custom",

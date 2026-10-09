@@ -93,6 +93,11 @@
                              t-esc="line.customer_note"/>
                     </div>
                 </div>
+                <div class="ferreteria-ticket-grand-total">
+                    <span>TOTAL:</span>
+                    <span class="ferreteria-ticket-grand-total-amount"
+                          t-esc="props.formatCurrency(props.data.amount_total)"/>
+                </div>
             </t>
             <t t-else="">
                 <OrderWidget t-if="props.data.orderlines?.length"
@@ -116,6 +121,11 @@
                     </Orderline>
                 </OrderWidget>
             </t>
+        </xpath>
+
+        <xpath expr="//div[contains(concat(' ', normalize-space(@class), ' '), ' receipt-total ')]"
+               position="attributes">
+            <attribute name="t-if">not (props.data.fel_ticket and props.data.fel_ticket.enabled)</attribute>
         </xpath>
 
         <xpath expr="//div[@class='before-footer']" position="replace">

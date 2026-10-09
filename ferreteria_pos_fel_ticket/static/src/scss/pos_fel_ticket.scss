@@ -110,6 +110,26 @@
         font-size: 0.88em;
         overflow-wrap: anywhere;
     }
+
+    .ferreteria-ticket-grand-total {
+        align-items: baseline;
+        border-top: 2px solid #000;
+        display: flex;
+        font-size: 1.14em;
+        font-weight: 700;
+        justify-content: space-between;
+        line-height: 1.2;
+        margin: 0.35rem 0 0.15rem;
+        padding-top: 0.25rem;
+        width: 100%;
+    }
+
+    .ferreteria-ticket-grand-total-amount,
+    .ferreteria-ticket-grand-total .pos-receipt-right-align {
+        margin-left: auto;
+        text-align: right;
+        white-space: nowrap;
+    }
 }
 
 @media print {
