@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_order_form_pos_invoice_link" model="ir.ui.view">
+        <field name="name">sale.order.form.ferreteria.pos.invoice</field>
+        <field name="model">sale.order</field>
+        <field name="inherit_id" ref="sale.view_order_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//div[@name='button_box']" position="inside">
+                <button type="object" name="action_view_ferreteria_pos_invoices"
+                        class="oe_stat_button" icon="fa-file-text-o"
+                        invisible="ferreteria_pos_invoice_count == 0">
+                    <field name="ferreteria_pos_invoice_count" widget="statinfo"
+                           string="Factura POS"/>
+                </button>
+            </xpath>
+            <xpath expr="//field[@name='partner_id']" position="after">
+                <field name="ferreteria_pos_config_id" invisible="not is_pos_created"/>
+                <field name="is_pos_created" invisible="1"/>
+            </xpath>
+        </field>
+    </record>
+</odoo>
