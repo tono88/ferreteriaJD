@@ -21,7 +21,7 @@ class PosOrder(models.Model):
             ))
         return sales
 
-    def action_pos_order_paid(self):
+    def _ferreteria_assert_single_checkout(self):
         """Impedir segundo cobro/factura concurrente de la misma cotización.
 
         El bloqueo de fila dura hasta confirmar la transacción de sincronización
@@ -62,6 +62,17 @@ class PosOrder(models.Model):
                     "La cotización debe facturarse desde este POS. "
                     "Active Factura en la pantalla de pago."
                 ))
+        return True
+
+    def _process_saved_order(self, draft):
+        # El núcleo captura algunas excepciones de action_pos_order_paid()
+        # y todavía intenta crear movimientos: validar ANTES de su llamada.
+        if not draft:
+            self._ferreteria_assert_single_checkout()
+        return super()._process_saved_order(draft)
+
+    def action_pos_order_paid(self):
+        self._ferreteria_assert_single_checkout()
         return super().action_pos_order_paid()
 
     def _prepare_invoice_vals(self):
