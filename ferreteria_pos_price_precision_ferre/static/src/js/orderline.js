@@ -10,10 +10,11 @@ patch(Orderline, {
             ...Orderline.props.line,
             shape: {
                 ...Orderline.props.line.shape,
+                ferreQty: { type: String, optional: true },
+                ferreUnit: { type: String, optional: true },
                 ferreUnitPrice: { type: String, optional: true },
                 ferreLineTotal: { type: String, optional: true },
             },
         },
     },
 });
-

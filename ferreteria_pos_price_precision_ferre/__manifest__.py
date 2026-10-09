@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 {
     "name": "Ferretería - Precisión visual de precios POS",
-    "version": "18.0.1.0.0",
+    "version": "18.0.1.0.2",
     "category": "Point of Sale",
     "summary": "Muestra cantidad, precio unitario y total de línea con hasta 6 decimales en el POS",
     "author": "Custom",
@@ -26,4 +26,3 @@
     "application": False,
     "auto_install": False,
 }
-

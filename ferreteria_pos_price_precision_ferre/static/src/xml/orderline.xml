@@ -14,8 +14,8 @@
         <xpath expr="//li[hasclass('price-per-unit')]" position="after">
             <li class="ferre-price-detail d-none align-items-baseline justify-content-between gap-2 w-100">
                 <span class="ferre-price-equation text-truncate">
-                    <span class="qty px-1 border rounded text-bg-view fw-bolder me-1" t-esc="line.qty"/>
-                    <t t-if="line.unit"><span t-esc="line.unit"/> </t>
+                    <span class="qty px-1 border rounded text-bg-view fw-bolder me-1" t-esc="line.ferreQty"/>
+                    <t t-if="line.ferreUnit"><span t-esc="line.ferreUnit"/> </t>
                     <span aria-hidden="true">×</span>
                     <span class="ferre-unit-price" t-esc="line.ferreUnitPrice"/>
                 </span>
@@ -28,4 +28,3 @@
         </xpath>
     </t>
 </templates>
-
