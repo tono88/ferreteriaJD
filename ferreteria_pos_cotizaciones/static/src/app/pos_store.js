@@ -72,7 +72,16 @@ patch(PosStore.prototype, {
         if (order.state !== "cancel") {
             choices.push({ id: "cancel", item: "cancel", label: _t("Cancelar pedido") });
         }
-        choices.push({ id: "standard", item: "standard", label: _t("Cobrar / anticipo (opciones originales)") });
+        // En cotizaciones creadas por este módulo no se habilita anticipo:
+        // el flujo exige UN comprobante fiscal al cobrar el pedido completo.
+        // Para pedidos externos se conserva sin cambios el menú de pos_sale.
+        if (!order.is_pos_created) {
+            choices.push({
+                id: "standard",
+                item: "standard",
+                label: _t("Cobrar / anticipo (opciones originales)"),
+            });
+        }
         const choice = await makeAwaitable(this.dialog, SelectionPopup, {
             title: _t("Seleccione una acción para %s", order.name),
             list: choices,
