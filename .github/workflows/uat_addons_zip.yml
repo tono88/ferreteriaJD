@@ -1,0 +1,39 @@
+name: Descargar módulos UAT por separado
+
+on:
+  push:
+    branches:
+      - fix/pos-quotation-warehouse-single-invoice-uat
+    paths:
+      - "ferreteria_pos_cotizaciones/**"
+      - "ferreteria_no_negative_stock_ferre/**"
+      - ".github/workflows/uat_addons_zip.yml"
+  workflow_dispatch:
+
+jobs:
+  empaquetar:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Obtener archivos de la rama UAT
+        uses: actions/checkout@v4
+      - name: Preparar directorios de descarga
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p descarga/cotizaciones descarga/inventario
+          cp -a ferreteria_pos_cotizaciones descarga/cotizaciones/
+          cp -a ferreteria_no_negative_stock_ferre descarga/inventario/
+      - name: Descargar POS Cotizaciones
+        uses: actions/upload-artifact@v4
+        with:
+          name: ferreteria_pos_cotizaciones_UAT
+          path: descarga/cotizaciones/
+          if-no-files-found: error
+          retention-days: 30
+      - name: Descargar Bloqueo de Inventario
+        uses: actions/upload-artifact@v4
+        with:
+          name: ferreteria_no_negative_stock_ferre_UAT
+          path: descarga/inventario/
+          if-no-files-found: error
+          retention-days: 30

@@ -34,34 +34,48 @@ patch(ControlButtons.prototype, {
         try {
             quotation = await this.pos.data.call("sale.order", "create_quotation_from_pos", [
                 partner.id, items, this.pos.config.id,
+                cart.pricelist_id?.id || false, cart.fiscal_position_id?.id || false,
             ]);
         } catch (error) {
+            console.error("Error al guardar cotización POS", error);
             this.dialog.add(AlertDialog, {
                 title: _t("No se pudo crear la cotización"),
-                body: _t("Revise los permisos, productos y la conexión. No se ha vaciado la venta."),
+                body: _t("Revise permisos, productos, almacén y conexión. La venta sigue intacta."),
             });
             return;
         }
-        // Borrar el carrito solo después de que el servidor confirme la creación.
+        // La cotización NO factura ni descuenta existencias.
+        // No debe quedar un carrito duplicado después de guardarla.
         for (const line of cartLines) {
             line.delete();
         }
         cart.set_partner(false);
         const confirm = await ask(this.dialog, {
             title: _t("Cotización creada: %s", quotation.name),
-            body: _t("¿Desea confirmarla como pedido de venta? Si no, permanecerá como cotización."),
-            confirmLabel: _t("Confirmar pedido"),
-            cancelLabel: _t("Dejar como cotización"),
+            body: _t(
+                "Almacén: %s. ¿Desea cargarla en el POS para cobrar y generar UNA factura? " +
+                "El pedido se confirma al finalizar el cobro, no antes.",
+                quotation.warehouse
+            ),
+            confirmLabel: _t("Confirmar y cobrar"),
+            cancelLabel: _t("Guardar cotización"),
         });
         if (confirm) {
             try {
-                await this.pos.data.call("sale.order", "action_confirm", [[quotation.id]]);
-                this.pos.notification.add(_t("Pedido confirmado."), { type: "success" });
+                await this.pos.ferreteriaLoadQuotationToPayment(quotation.id);
             } catch (error) {
-                this.pos.notification.add(_t("Cotización guardada, pero no se pudo confirmar."), {
-                    type: "warning",
-                });
+                console.error("Error cargando la cotización al POS", error);
+                this.pos.notification.add(
+                    _t("Cotización guardada, pero no se pudo cargar para el cobro. " +
+                       "Abra la lista de cotizaciones y vuelva a intentarlo."),
+                    { type: "danger" }
+                );
             }
+        } else {
+            this.pos.notification.add(
+                _t("Cotización %s guardada sin factura ni movimiento de inventario.", quotation.name),
+                { type: "success" }
+            );
         }
     },
 });
