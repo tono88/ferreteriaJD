@@ -1,0 +1,27 @@
+name: Descargar Discount Manager UAT
+
+on:
+  push:
+    branches:
+      - fix/pos-descontar-porcentaje-global-cajero
+    paths:
+      - "pos_discount_manager/**"
+      - ".github/workflows/uat_discount_zip.yml"
+  workflow_dispatch:
+
+jobs:
+  empaquetar:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Preparar complemento Odoo
+        run: |
+          mkdir -p descarga
+          cp -a pos_discount_manager descarga/
+      - name: Descargar módulo actualizado para pruebas UAT
+        uses: actions/upload-artifact@v4
+        with:
+          name: pos_discount_manager_UAT
+          path: descarga/
+          if-no-files-found: error
+          retention-days: 30
