@@ -1,41 +1,77 @@
-# Aprobación de descuentos POS (Odoo 18)
+# Aprobación de descuentos POS (Odoo 18) — 2.2.0
 
-Adaptación de **POS Discount Manager Approval** de Cybrosys Technologies
-(autor Bhagyadev KP, AGPL-3), manteniendo el límite por empleado.
+Adaptación de **POS Discount Manager Approval** de Cybrosys Technologies,
+AGPL-3. Mantiene el límite porcentual por empleado y añade códigos OTP
+individuales, aleatorios y de un solo uso mediante `pos_discount_otp_generator`.
 
-## Configuración
+## Dos modalidades de identificación
 
-1. Active **Iniciar sesión como empleado** en Punto de venta → Ajustes.
-2. En **Empleados**, establezca **Límite de descuento (%)**, por ejemplo **1**
-   para Ana Reyes. El valor 0 conserva la convención histórica: sin límite.
-3. Cierre y vuelva a abrir la sesión POS para cargar el campo.
-4. Aplique un **descuento por línea** o un **descuento global**.
-5. En **Pago → Validar**, si se excede el límite combinado, el POS solicita
-   el código generado por un gerente con `pos_discount_otp_generator`.
-6. El código se valida contra el cajero actualmente conectado en POS;
-   no contra la cuenta administrativa que abrió la sesión.
-7. El código caduca en 10 minutos y se consume una sola vez.
+### A. Selección de empleados Odoo (`module_pos_hr = True`)
 
-## Qué cambia respecto a la versión inicial
+Activar **Iniciar sesión como empleado** en los ajustes del POS. El cajero
+elige empleado, inicia sesión con su PIN/credencial y se utiliza el campo
+**Límite de descuento (%)** de esa ficha.
 
-La versión anterior comprobaba únicamente `pos.order.line.discount`.
-En Odoo 18, `pos_discount` implementa los descuentos globales mediante una
-línea con producto de descuento y precio negativo, que la implementación
-anterior omitía. La nueva versión evalúa ambos tipos y el porcentaje total
-combinado. Si no se ha cargado el campo de límite en el POS, bloquea la
-validación en lugar de tratar el caso como descuento ilimitado.
+### B. Cajero único por cuenta de Odoo (sin PIN adicional)
 
-## Prueba UAT
+Instalar opcionalmente **`ferreteria_pos_cajero_unico_ferre`**. Cerrar la
+sesión POS, desactivar **Iniciar sesión como empleado** y activar
+**Cajero único según cuenta de Odoo** en cada configuración de POS elegida.
 
-Con Ana Reyes (límite 1 %), agregue un producto y aplique 2 % global.
-En Pago → Validar debe aparecer el diálogo de autorización. Con 0.5 % no
-debería solicitar código. Repita aplicando 2 % por línea y 0.7 % por
-línea + 0.7 % global. Haga pruebas de OTP incorrecto, correcto,
-caducado y reutilizado.
+Cada usuario POS debe tener una cuenta Odoo propia y un único empleado activo
+vinculado mediante **Empleados → Ajustes de RR. HH. → Usuario relacionado**,
+dentro de la misma empresa del POS. El POS se abre directamente bajo esa cuenta,
+sin PIN adicional ni posibilidad de cambiar a otro cajero en la interfaz.
 
-**Alcance:** este control está en la pantalla POS del navegador, como en el
-módulo original. No constituye una barrera completa ante clientes POS
-modificados o integraciones que eviten la interfaz. Para seguridad fuerte,
-añadir validación de descuentos del pedido en el servidor.
+En esta modalidad el servidor asocia la cuenta autenticada a su empleado
+mediante `get_logged_user_discount_policy`. El navegador **nunca decide**
+qué empleado corresponde a la cuenta para emitir autorización. El OTP se consume
+mediante `consume_code_for_logged_user`, reutilizando la validación segura de
+un solo uso del generador original.
 
-Código distribuido bajo AGPL-3; créditos: Cybrosys Technologies Pvt. Ltd.
+**Condición de sesión:** el canje OTP del generador actual requiere una sesión
+POS `opened` cuyo `user_id` sea el mismo usuario autenticado que cobra.
+Cuando una caja es abierta por otro usuario el canje no procede; se debe abrir
+la sesión con el cajero autenticado. Esto evita ampliar permisos de manera
+implícita.
+
+**Cierre de caja básico:** como `module_pos_hr` se desactiva para ese POS,
+el estándar de Odoo muestra **Cerrar caja** a usuarios con acceso normal al POS.
+Las diferencias de arqueo mayores que el máximo autorizado siguen exigiendo
+permiso de gerente. No se amplían ACL de Contabilidad ni se permite saltar
+el cierre contable habitual.
+
+## Autorización por descuento
+
+1. Ajustar **Límite de descuento (%)** en Empleados: por ejemplo 1 para Ana.
+2. Aplicar un descuento de línea o global; también se detectan combinaciones.
+3. Entrar en **Pago → Validar**.
+4. Si el porcentaje efectivo excede el límite, aparece autorización del cajero.
+5. El gerente genera código en **Punto de venta → Códigos para descuentos**,
+   seleccionando el empleado y el POS correspondiente.
+6. El cajero introduce los seis dígitos. El código vence a los 10 minutos y
+   solo se puede usar una vez. Al generar otro o fallar cinco veces, se invalida.
+
+Un límite de **0** conserva la convención original: **sin límite**. Si no hay
+un empleado correcto, falla la consulta al servidor, o no se ha cargado la
+política, el POS no permite finalizar esa operación. Por lo tanto, con cajero
+único se necesita conectividad al validar cada venta.
+
+## Pruebas UAT
+
+- Ana con límite 1%, descuento 0.5%: no debe solicitar OTP.
+- Ana con descuento global o individual de 5%: debe solicitar OTP.
+- Dos descuentos de 0.7% (línea+global) juntos: solicitan OTP.
+- OTP ya utilizado, vencido, de otra sucursal o de otro empleado: rechazar.
+- Cambiar de usuario de Odoo, abrir su propia sesión POS y comprobar que
+  el límite se resuelve a su empleado, nunca al anterior.
+- Comprobar cierre de caja con arqueo correcto como usuario básico y rechazo
+  de una diferencia mayor que el límite de la empresa.
+- Comprobar que la modalidad `module_pos_hr=True` conserva comportamiento.
+
+**Alcance:** el control porcentual se ejecuta en la interfaz POS del navegador
+(como en el addon de origen), no es una regla universal sobre pedidos generados
+por clientes alterados u otras integraciones. Para una barrera antifraude
+completa, la regla requiere validación de porcentaje también en backend.
+
+Código AGPL-3 con atribución original a Cybrosys Technologies Pvt. Ltd.
