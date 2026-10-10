@@ -1,9 +1,9 @@
 {
     "name": "POS - Aprobación de descuentos por cajero",
-    "version": "18.0.2.1.0",
+    "version": "18.0.2.2.0",
     "category": "Punto de venta",
-    "summary": "Límites de descuento individuales y autorización mediante códigos de un solo uso.",
-    "description": "Los descuentos globales y por línea que superen el límite del cajero requieren aprobación OTP.",
+    "summary": "Descuentos individuales/globales y autorizaciones OTP con empleado o cuenta de Odoo.",
+    "description": "Soporta cajeros seleccionados por pos_hr o un único cajero vinculado a la cuenta autenticada de Odoo.",
     "author": "Cybrosys Technologies Pvt. Ltd.; adaptación Ferretería JD",
     "website": "https://www.cybrosys.com",
     "depends": ["pos_discount", "pos_hr", "pos_discount_otp_generator"],
