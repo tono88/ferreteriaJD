@@ -9,7 +9,8 @@
                         <div>DEL: <t t-esc="data.get('date_from') or ''"/> AL: <t t-esc="data.get('date_to') or ''"/></div>
                         <div>Punto de venta: <t t-esc="data.get('pos_config_name') or 'Todos'"/></div>
                         <div>Clientes: <t t-esc="data.get('partner_names') or 'Todos'"/></div>
-                        <div>Zona horaria POS: <t t-esc="report_timezone"/></div>
+                        <div>Zona horaria comercial: <t t-esc="report_timezone"/></div>
+                        <div>Filtrar por: <t t-esc="date_basis_label"/></div>
                     </div>
                     <div class="col-4" style="text-align:right;">
                         <strong t-esc="company.name"/>
