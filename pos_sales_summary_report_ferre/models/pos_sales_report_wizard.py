@@ -1,8 +1,7 @@
 
 # -*- coding: utf-8 -*-
 from odoo import api, fields, models, _
-from datetime import datetime, time
-import pytz
+from .report_timezone import local_report_utc_bounds, resolve_report_timezone
 
 REPORT_XMLID = "pos_sales_summary_report_ferre.action_report_pos_sales_summary"
 REPORT_NAME = "pos_sales_summary_report_ferre.report_pos_sales_summary"
@@ -31,6 +30,14 @@ class PosSalesReportWizard(models.TransientModel):
 
     date_from = fields.Date(string="Desde", required=True, default=lambda self: fields.Date.context_today(self))
     date_to = fields.Date(string="Hasta", required=True, default=lambda self: fields.Date.context_today(self))
+    date_basis = fields.Selection([
+        ("document", "Fecha del documento (factura o comprobante POS)"),
+        ("order", "Fecha de la operación POS"),
+    ], string="Filtrar por", required=True, default="document",
+       help="Documento: las facturas publicadas se filtran por su fecha fiscal; "
+            "los comprobantes sin factura publicada se filtran por fecha POS local. "
+            "Operación POS: todas las órdenes se filtran por la fecha y hora de venta.")
+
     invoice_filter = fields.Selection([
         ("all", "Todos"),
         ("invoiced", "Solo Facturadas"),
@@ -46,12 +53,17 @@ class PosSalesReportWizard(models.TransientModel):
 
     def _get_utc_bounds(self):
         self.ensure_one()
-        user_tz = pytz.timezone(self.env.user.tz or "UTC")
-        start_local = datetime.combine(self.date_from, time.min)
-        end_local = datetime.combine(self.date_to, time.max)
-        start_utc = user_tz.localize(start_local).astimezone(pytz.utc)
-        end_utc = user_tz.localize(end_local).astimezone(pytz.utc)
-        return start_utc.strftime("%Y-%m-%d %H:%M:%S"), end_utc.strftime("%Y-%m-%d %H:%M:%S")
+        start_utc, end_utc_exclusive = local_report_utc_bounds(
+            self.date_from, self.date_to, self._get_report_timezone()
+        )
+        return (
+            start_utc.strftime("%Y-%m-%d %H:%M:%S"),
+            end_utc_exclusive.strftime("%Y-%m-%d %H:%M:%S"),
+        )
+
+    def _get_report_timezone(self):
+        self.ensure_one()
+        return resolve_report_timezone(self.env.company)
 
     def _fallback_report_action(self):
         report = self.env["ir.actions.report"].sudo().search([("report_name", "=", REPORT_NAME)], limit=1)
@@ -70,6 +82,8 @@ class PosSalesReportWizard(models.TransientModel):
             "date_from": str(self.date_from),
             "date_to": str(self.date_to),
             "invoice_filter": self.invoice_filter,
+            "date_basis": self.date_basis,
+            "report_timezone": self._get_report_timezone(),
             "start_utc": start_utc,
             "end_utc": end_utc,
             # 👇 nuevo
@@ -112,6 +126,8 @@ class PosSalesReportWizard(models.TransientModel):
             "date_from": str(self.date_from),
             "date_to": str(self.date_to),
             "invoice_filter": self.invoice_filter,
+            "date_basis": self.date_basis,
+            "report_timezone": self._get_report_timezone(),
             "start_utc": start_utc,
             "end_utc": end_utc,
             "pos_config_id": self.pos_config_id.id if self.pos_config_id else False,
