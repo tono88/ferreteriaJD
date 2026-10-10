@@ -1,10 +1,11 @@
 # -*- coding: utf-8 -*-
 import re
+from datetime import datetime
 from collections import OrderedDict
 
-import pytz
-
 from odoo import api, fields, models, _
+
+from ..models.report_timezone import resolve_report_timezone
 
 
 class ReportPosSalesSummary(models.AbstractModel):
@@ -60,32 +61,26 @@ class ReportPosSalesSummary(models.AbstractModel):
             return f"{currency.symbol} {text}"
         return f"{text} {currency.symbol}"
 
-    def _report_timezone(self):
-        timezone_name = (
-            self.env.user.tz
-            or self.env.company.partner_id.tz
-            or "America/Guatemala"
-        )
-        try:
-            pytz.timezone(timezone_name)
-        except pytz.UnknownTimeZoneError:
-            timezone_name = "America/Guatemala"
-        return timezone_name
+    def _report_timezone(self, data=None):
+        # Usar la misma zona comercial que el wizard, sin depender del
+        # usuario que imprime el PDF o exporta el archivo Excel.
+        name = (data or {}).get("report_timezone")
+        return name or resolve_report_timezone(self.env.company)
 
-    def _order_local_date(self, order):
+    def _order_local_date(self, order, timezone_name):
         if not order.date_order:
             return False
         localized = fields.Datetime.context_timestamp(
-            order.with_context(tz=self._report_timezone()), order.date_order
+            order.with_context(tz=timezone_name), order.date_order
         )
         return localized.date()
 
-    def _document_date_data(self, order):
+    def _document_date_data(self, order, timezone_name):
         move = order.account_move
         if move and move.state == "posted" and move.invoice_date:
             return move.invoice_date, ""
 
-        fallback_date = self._order_local_date(order)
+        fallback_date = self._order_local_date(order, timezone_name)
         if not move and order.state == "invoiced":
             observation = _("Orden facturada sin factura vinculada")
         elif move and move.state == "cancel":
@@ -100,13 +95,13 @@ class ReportPosSalesSummary(models.AbstractModel):
             observation = ""
         return fallback_date, observation
 
-    def _line_from_order(self, order, currency):
+    def _line_from_order(self, order, currency, timezone_name):
         move = order.account_move
         invoice = "-"
         if move:
             invoice = getattr(move, "firma_fel", False) or move.name or "-"
 
-        document_date, observation = self._document_date_data(order)
+        document_date, observation = self._document_date_data(order, timezone_name)
         cash, other = self._split_payments(order)
         total = order.amount_total or 0.0
         return {
@@ -135,18 +130,17 @@ class ReportPosSalesSummary(models.AbstractModel):
 
     def _search_orders(self, data):
         start_utc = data.get("start_utc")
-        end_utc = data.get("end_utc")
+        end_utc = data.get("end_utc")  # Inicio del siguiente día, EXCLUSIVO
+        date_from = data.get("date_from")
+        date_to = data.get("date_to")
+        date_basis = data.get("date_basis", "document")
         invoice_filter = data.get("invoice_filter", "all")
         pos_config_id = self._normalize_pos_config_id(data)
         partner_ids = data.get("partner_ids") or []
         if isinstance(partner_ids, int):
             partner_ids = [partner_ids]
 
-        domain = [
-            ("state", "in", ["paid", "done", "invoiced"]),
-            ("date_order", ">=", start_utc),
-            ("date_order", "<=", end_utc),
-        ]
+        domain = [("state", "in", ["paid", "done", "invoiced"])]
         if pos_config_id:
             domain += [
                 "|",
@@ -156,27 +150,48 @@ class ReportPosSalesSummary(models.AbstractModel):
         if partner_ids:
             domain.append(("partner_id", "in", partner_ids))
 
-        orders = self.env["pos.order"].search(
-            domain, order="partner_id, date_order, name"
+        pos_time_range = [
+            ("date_order", ">=", start_utc),
+            ("date_order", "<", end_utc),
+        ]
+        pos_orders = self.env["pos.order"].search(domain + pos_time_range)
+
+        if date_basis == "document":
+            # La fecha mostrada en la columna "Fecha documento" también debe
+            # determinar el corte. En facturas publicadas usamos invoice_date
+            # (fecha fiscal), NO date_order. Así no aparecen facturas del 7 al
+            # pedir solo el 8, aunque la orden se haya cargado el 8.
+            #
+            # Consultar también facturas cuya orden POS ocurrió otro día:
+            # filtrar sólo date_order haría perder esas facturas.
+            invoiced_orders = self.env["pos.order"].search(domain + [
+                ("account_move.state", "=", "posted"),
+                ("account_move.invoice_date", ">=", date_from),
+                ("account_move.invoice_date", "<=", date_to),
+            ])
+            fallback_orders = pos_orders.filtered(
+                lambda order: not (
+                    order.account_move
+                    and order.account_move.state == "posted"
+                    and order.account_move.invoice_date
+                )
+            )
+            orders = fallback_orders | invoiced_orders
+        else:
+            orders = pos_orders
+
+        orders = orders.sorted(
+            key=lambda order: (
+                order.partner_id.id,
+                order.date_order or datetime.min,
+                order.name or "",
+            )
         )
 
-        # Preserve the existing business rule: if a refund order explicitly
-        # names its origin, show the refund and omit the original in the range.
-        refund_domain = [
-            ("state", "in", ["paid", "done", "invoiced"]),
-            ("date_order", ">=", start_utc),
-            ("date_order", "<=", end_utc),
-            ("amount_total", "<", 0),
-        ]
-        if pos_config_id:
-            refund_domain += [
-                "|",
-                ("config_id", "=", pos_config_id),
-                ("session_id.config_id", "=", pos_config_id),
-            ]
-        if partner_ids:
-            refund_domain.append(("partner_id", "in", partner_ids))
-        refund_orders = self.env["pos.order"].search(refund_domain)
+        # Si se produce un reembolso explícito dentro del mismo rango,
+        # excluir el documento original. El rango y modo son exactamente
+        # los mismos que para las ventas incluidas arriba.
+        refund_orders = orders.filtered(lambda order: order.amount_total < 0)
         original_names = set()
         for refund in refund_orders:
             name = (refund.name or "").strip()
@@ -195,11 +210,12 @@ class ReportPosSalesSummary(models.AbstractModel):
     def _get_report_values(self, docids, data=None):
         data = data or {}
         orders = self._search_orders(data)
+        timezone_name = self._report_timezone(data)
         currency = self.env.company.currency_id
         lines = []
         invoice_references = []
         for order in orders:
-            line = self._line_from_order(order, currency)
+            line = self._line_from_order(order, currency, timezone_name)
             if line["contado"] == 0 and line["credito"] == 0:
                 continue
             lines.append(line)
@@ -226,7 +242,9 @@ class ReportPosSalesSummary(models.AbstractModel):
         total_cash = sum(line["contado"] for line in lines)
         total_other = sum(line["credito"] for line in lines)
         total_general = sum(line["total"] for line in lines)
-        now = fields.Datetime.context_timestamp(self.env.user, fields.Datetime.now())
+        now = fields.Datetime.context_timestamp(
+            self.with_context(tz=timezone_name), fields.Datetime.now()
+        )
 
         return {
             "doc_ids": docids,
@@ -246,5 +264,9 @@ class ReportPosSalesSummary(models.AbstractModel):
             "user_label": self.env.user.name,
             "now_label": now.strftime("%d/%m/%Y %I:%M:%S %p"),
             "company": self.env.company,
-            "report_timezone": self._report_timezone(),
+            "report_timezone": timezone_name,
+            "date_basis_label": (
+                _("Fecha del documento") if data.get("date_basis", "document") == "document"
+                else _("Fecha de la venta POS")
+            ),
         }
