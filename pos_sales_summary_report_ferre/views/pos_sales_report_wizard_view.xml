@@ -8,6 +8,7 @@
           <group>
             <field name="date_from"/>
             <field name="date_to"/>
+            <field name="date_basis"/>
           </group>
           <group>
             <field name="invoice_filter"/>
