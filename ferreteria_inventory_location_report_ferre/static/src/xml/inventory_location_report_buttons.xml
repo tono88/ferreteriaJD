@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+    <t t-name="ferreteria_inventory_location_report_ferre.ListView.Buttons" t-inherit="web.ListView.Buttons" t-inherit-mode="primary">
+        <xpath expr="//div[contains(@class, 'o_list_buttons')]" position="inside">
+            <button t-if="props.context.always_show_loc" type="button" class="btn btn-secondary" t-on-click="onPrintLocationPdf">
+                <i class="fa fa-file-pdf-o me-1"/>Imprimir PDF
+            </button>
+            <button t-if="props.context.always_show_loc" type="button" class="btn btn-secondary" t-on-click="onExportLocationXlsx">
+                <i class="fa fa-file-excel-o me-1"/>Exportar Excel
+            </button>
+        </xpath>
+    </t>
+</templates>
+

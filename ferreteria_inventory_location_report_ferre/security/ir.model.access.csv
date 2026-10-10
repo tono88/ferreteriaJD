@@ -1,0 +1,3 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_inventory_location_report_download_stock_user,inventory.location.report.download stock user,model_ferreteria_inventory_location_report_download,stock.group_stock_user,1,1,1,1
+

@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<odoo>
+    <record id="paperformat_inventory_location" model="report.paperformat">
+        <field name="name">Inventario por ubicacion - A4 horizontal</field>
+        <field name="default" eval="False"/>
+        <field name="format">A4</field>
+        <field name="orientation">Landscape</field>
+        <field name="margin_top">14</field>
+        <field name="margin_bottom">12</field>
+        <field name="margin_left">8</field>
+        <field name="margin_right">8</field>
+        <field name="header_line" eval="False"/>
+        <field name="header_spacing">6</field>
+        <field name="dpi">90</field>
+    </record>
+
+    <record id="action_inventory_location_pdf" model="ir.actions.report">
+        <field name="name">Inventario por ubicacion</field>
+        <field name="model">stock.quant</field>
+        <field name="report_type">qweb-pdf</field>
+        <field name="report_name">ferreteria_inventory_location_report_ferre.report_inventory_location</field>
+        <field name="report_file">ferreteria_inventory_location_report_ferre.report_inventory_location</field>
+        <field name="paperformat_id" ref="paperformat_inventory_location"/>
+        <field name="print_report_name">'Inventario_por_ubicacion'</field>
+    </record>
+
+    <template id="report_inventory_location">
+        <t t-call="web.html_container">
+            <t t-call="web.external_layout">
+                <div class="page">
+                    <style>
+                        table.inventory-location { width: 100%; border-collapse: collapse; font-size: 10px; }
+                        table.inventory-location thead { display: table-header-group; }
+                        table.inventory-location tr { page-break-inside: avoid; }
+                        table.inventory-location th { background: #714b67; color: white; padding: 5px; border: 1px solid #777; }
+                        table.inventory-location td { padding: 4px; border: 1px solid #aaa; vertical-align: top; }
+                        .qty { text-align: right; white-space: nowrap; }
+                        .meta { color: #555; font-size: 9px; margin-bottom: 3px; }
+                    </style>
+                    <h3 class="text-center mb-1">DISTRIBUIDORA Y FERRETERIA JB</h3>
+                    <h4 class="text-center mt-0">Inventario por ubicacion</h4>
+                    <div class="meta"><strong>Generado:</strong> <span t-esc="generated_at"/></div>
+                    <div class="meta"><strong>Filtros:</strong> <span t-esc="filter_summary"/></div>
+                    <div class="meta"><strong>Registros:</strong> <span t-esc="record_count"/></div>
+                    <table class="inventory-location mt-2">
+                        <thead>
+                            <tr>
+                                <th style="width: 13%;">Codigo</th>
+                                <th style="width: 34%;">Producto</th>
+                                <th style="width: 32%;">Ubicacion</th>
+                                <th style="width: 11%;">Existencia</th>
+                                <th style="width: 10%;">UDM</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr t-foreach="lines" t-as="line">
+                                <td><span t-esc="line['code']"/></td>
+                                <td><span t-esc="line['product']"/></td>
+                                <td><span t-esc="line['location']"/></td>
+                                <td class="qty"><span t-esc="line['quantity_display']"/></td>
+                                <td><span t-esc="line['uom']"/></td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </t>
+        </t>
+    </template>
+</odoo>
+
