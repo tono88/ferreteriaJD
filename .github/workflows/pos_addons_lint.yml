@@ -44,6 +44,8 @@ jobs:
           PY
       - name: Pruebas del límite de descuentos globales y por línea
         run: node pos_discount_manager/tests/test_discount_guard.cjs
+      - name: Regresión campos de pos.config y use_pricelist
+        run: python ferreteria_pos_cajero_unico_ferre/tests/test_pos_config_fields_contract.py
 
       - name: Revisar JavaScript POS
         run: |

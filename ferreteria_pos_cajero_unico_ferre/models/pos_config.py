@@ -22,7 +22,15 @@ class PosConfig(models.Model):
 
     @api.model
     def _load_pos_data_fields(self, config_id):
-        values = super()._load_pos_data_fields(config_id)
-        if "ferreteria_cajero_unico" not in values:
-            values.append("ferreteria_cajero_unico")
-        return values
+        # Odoo 18 utiliza [] para indicar que deben cargarse TODOS los
+        # campos disponibles de pos.config (search_read(fields=[])).
+        # Si agregamos solo nuestro campo, desaparece "use_pricelist"
+        # y falla el arranque del POS con KeyError: use_pricelist.
+        fields_to_load = super()._load_pos_data_fields(config_id)
+        if not fields_to_load:
+            return fields_to_load
+
+        # Compatibilidad con otros módulos que sí indican una lista explícita.
+        if "ferreteria_cajero_unico" not in fields_to_load:
+            return [*fields_to_load, "ferreteria_cajero_unico"]
+        return fields_to_load
