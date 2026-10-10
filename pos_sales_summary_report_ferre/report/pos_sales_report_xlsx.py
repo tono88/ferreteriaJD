@@ -42,7 +42,8 @@ class PosSalesSummaryXlsx(models.AbstractModel):
             % (values.get("data", {}).get("date_from", ""), values.get("data", {}).get("date_to", "")),
         )
         row += 1
-        sheet.write(row, 0, _("Zona horaria: %s") % values.get("report_timezone", ""))
+        sheet.write(row, 0, _("Zona horaria comercial: %s") % values.get("report_timezone", ""))
+        sheet.write(row, 4, _("Filtrar por: %s") % values.get("date_basis_label", ""))
         row += 2
 
         headers = [
