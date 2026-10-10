@@ -1,0 +1,38 @@
+name: Descargar cajero único y Discount Manager UAT
+
+on:
+  push:
+    branches:
+      - feature/pos-cajero-unico-por-usuario-uat
+    paths:
+      - "pos_discount_manager/**"
+      - "ferreteria_pos_cajero_unico_ferre/**"
+      - ".github/workflows/uat_cajero_unico_zip.yml"
+  workflow_dispatch:
+
+jobs:
+  empaquetar:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Preparar módulos Odoo 18
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p descarga/cajero descarga/descuentos
+          cp -a ferreteria_pos_cajero_unico_ferre descarga/cajero/
+          cp -a pos_discount_manager descarga/descuentos/
+      - name: Descargar cajero único
+        uses: actions/upload-artifact@v4
+        with:
+          name: ferreteria_pos_cajero_unico_UAT
+          path: descarga/cajero/
+          if-no-files-found: error
+          retention-days: 30
+      - name: Descargar Discount Manager actualizado
+        uses: actions/upload-artifact@v4
+        with:
+          name: pos_discount_manager_UAT_v2_2
+          path: descarga/descuentos/
+          if-no-files-found: error
+          retention-days: 30
