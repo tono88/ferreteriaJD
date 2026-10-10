@@ -4,6 +4,7 @@ on:
   pull_request:
     paths:
       - "pos_discount_manager/**"
+      - "pos_sales_summary_report_ferre/**"
       - "ferreteria_pos_cajero_unico_ferre/**"
       - "pos_discount_otp_generator/**"
       - "ferreteria_pos_cotizaciones/**"
@@ -12,6 +13,7 @@ on:
   push:
     paths:
       - "pos_discount_manager/**"
+      - "pos_sales_summary_report_ferre/**"
       - "ferreteria_pos_cajero_unico_ferre/**"
       - "pos_discount_otp_generator/**"
       - "ferreteria_pos_cotizaciones/**"
@@ -28,7 +30,7 @@ jobs:
           import ast
           from pathlib import Path
           from xml.etree import ElementTree
-          modules = ("pos_discount_manager", "pos_discount_otp_generator", "ferreteria_pos_cotizaciones", "ferreteria_no_negative_stock_ferre", "ferreteria_pos_cajero_unico_ferre")
+          modules = ("pos_discount_manager", "pos_discount_otp_generator", "ferreteria_pos_cotizaciones", "ferreteria_no_negative_stock_ferre", "ferreteria_pos_cajero_unico_ferre", "pos_sales_summary_report_ferre")
           for name in modules:
               root = Path(name)
               for f in root.rglob("*.py"):
@@ -46,6 +48,12 @@ jobs:
         run: node pos_discount_manager/tests/test_discount_guard.cjs
       - name: Regresión campos de pos.config y use_pricelist
         run: python ferreteria_pos_cajero_unico_ferre/tests/test_pos_config_fields_contract.py
+
+      - name: Probar zona horaria y fecha fiscal del reporte POS
+        run: |
+          python -m pip install pytz
+          python pos_sales_summary_report_ferre/tests/test_report_timezone.py
+          python pos_sales_summary_report_ferre/tests/test_report_document_date.py
 
       - name: Revisar JavaScript POS
         run: |
