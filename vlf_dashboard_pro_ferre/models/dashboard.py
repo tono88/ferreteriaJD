@@ -137,9 +137,15 @@ class VlfDashboard(models.Model):
         items = []
         for item in dashboard.item_ids.filtered('active').sorted(lambda i: i.sequence):
             try:
-                items.append(item.get_payload(filters=filters))
-            except Exception as exc:  # keep dashboard useful even if one card fails
-                _logger.exception('Error rendering dashboard item %s', item.display_name)
+                # A failing ORM/SQL query leaves the PostgreSQL transaction
+                # aborted.  Isolate each card so that other cards and the
+                # dashboard metadata remain readable, and keep the original
+                # exception visible in the server log and error card.
+                with self.env.cr.savepoint():
+                    payload = item.get_payload(filters=filters)
+                items.append(payload)
+            except Exception as exc:
+                _logger.exception('Error rendering dashboard item %s (id=%s)', item.display_name, item.id)
                 items.append(item.get_error_payload(str(exc)))
 
         return {

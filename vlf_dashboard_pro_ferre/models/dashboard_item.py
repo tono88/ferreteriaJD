@@ -182,15 +182,36 @@ class VlfDashboardItem(models.Model):
         model = self.env[self.model_id.model]
         custom_values = (filters or {}).get('custom') or {}
         for cfilter in self.dashboard_id.filter_ids.filtered('active').sorted(lambda f: f.sequence):
+            # In Dashboard Reports, AÑO is a *date range* filter, not an
+            # equality comparison against the field `date`. Generic equality
+            # would produce ('date', '=', '2026'), rejected by PostgreSQL.
+            # Reports builds the correct bounds in its item/metric services.
+            if (
+                cfilter.key == 'year'
+                and cfilter.field_name == 'date'
+                and 'managed_by_reports' in self.dashboard_id._fields
+                and self.dashboard_id.managed_by_reports
+            ):
+                continue
             field_name = self._resolve_custom_filter_field(cfilter, model)
             if not field_name:
                 # The same dashboard can contain different models. A custom filter only affects items where a compatible field exists.
                 continue
             value = custom_values.get(cfilter.key)
-            if (value is None or value == '') and cfilter.default_value not in (None, ''):
+            # False in a Char default_value means "not configured" in Odoo.
+            # For non-boolean controls, False can also mean "Todos".
+            # Do not turn either case into a domain like ('state', '=', False).
+            # Keep explicit False for boolean inputs: unchecked is meaningful.
+            value_is_empty = (
+                value is None or value == ''
+                or (value is False and cfilter.value_type != 'boolean')
+            )
+            if value_is_empty:
                 value = cfilter.default_value
-            if value is None or value == '':
-                continue
+                # False as a default is never an explicit filter (a real false
+                # boolean default can be configured using the string '0').
+                if value is None or value is False or value == '':
+                    continue
             value = self._coerce_custom_filter_value(cfilter, value)
             if cfilter.operator in ('in', 'not in') and not value:
                 continue

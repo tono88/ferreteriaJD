@@ -1,5 +1,14 @@
 # Tecnodyne Dashboard Pro para Odoo 18
 
+## 18.0.2.3.4 — corrección de filtros vacíos / icono
+
+- Ignora `False` como valor vacío en filtros personalizados no booleanos; evita
+  los dominios ORM como `('state', '=', False)` cuando el selector dice «Todos».
+- Conserva los valores booleanos explícitos y los valores predeterminados
+  válidos, incluido el literal `0` para falsos booleanos.
+- Corrige la referencia al icono (`vlf_dashboard_pro_ferre/static/description/icon.png`).
+- No modifica los dominios definidos de las tarjetas ni los datos de dashboards.
+
 ## 18.0.2.3.3
 
 - Corrige el renderizado OWL de filtros de selección evitando el uso de

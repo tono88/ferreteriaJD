@@ -1,6 +1,8 @@
 # -*- coding: utf-8 -*-
 from odoo import api, fields, models
 
+from .inventory_history import InventoryHistoryService
+
 
 class VlfDashboard(models.Model):
     _inherit = 'vlf.dashboard'
@@ -32,4 +34,48 @@ class VlfDashboard(models.Model):
                         {'value': str(year), 'label': str(year)} for year in years
                     ]
         payload.setdefault('filters', {})['company_id'] = self.env.company.id
+
+        # Inventario is the preconfigured operational stock dashboard. The
+        # historical mode is purely a read-only alternate rendering; no
+        # chart/domain definition is changed in the database.
+        is_inventory = bool(
+            dashboard and dashboard.name == 'Inventario'
+            and dashboard.item_ids.filtered(
+                lambda item: item.active and item.model_id.model == 'stock.quant'
+            )
+        )
+        if payload.get('dashboard') and is_inventory:
+            history = InventoryHistoryService(self.env)
+            payload['dashboard']['inventory_history_enabled'] = True
+            payload['dashboard']['inventory_warehouses'] = history.warehouse_options()
+            if filters.get('inventory_mode') == 'history':
+                snapshot = history.snapshot(
+                    filters.get('inventory_date'),
+                    filters.get('inventory_warehouse_id'),
+                )
+                originals = {data['id']: data for data in payload.get('items', [])}
+                historical_items = []
+                for item in dashboard.item_ids.filtered('active').sorted(lambda i: i.sequence):
+                    if not item.model_id or item.model_id.model != 'stock.quant':
+                        continue
+                    data = history.item_data(item, snapshot)
+                    if data is None:
+                        continue  # no false "historical reserved" or unrelated cards
+                    updated = dict(originals.get(item.id) or item.get_error_payload(''))
+                    updated.update({
+                        'type': item.item_type,
+                        'name': item.name,
+                        'labels': data['labels'],
+                        'values': data['values'],
+                        'rows': data['rows'],
+                        'total': data['total'],
+                        'allow_drill_down': False,  # current quants != historical detail
+                    })
+                    historical_items.append(updated)
+                payload['items'] = historical_items
+                payload['dashboard']['inventory_history_info'] = {
+                    'date': filters.get('inventory_date'),
+                    'provisional': snapshot['provisional'],
+                    'warehouses': history.warehouse_summary(snapshot),
+                }
         return payload

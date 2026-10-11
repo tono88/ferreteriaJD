@@ -55,3 +55,24 @@ Los importes de Ventas, POS y devoluciones se normalizan a la moneda de la compa
 ## Criterio de importes de esta entrega
 
 Los KPI monetarios se presentan en la moneda de la compañía e **incluyen impuestos**. Para las ventas positivas, la venta bruta se define como total cobrado más descuento antes de impuestos; la venta neta operativa corresponde al total cobrado menos las devoluciones registradas. El detalle conserva subtotal, impuestos, descuentos y devoluciones como columnas separadas.
+
+
+## Inventario histórico (18.0.1.1.3)
+
+El dashboard predefinido `Inventario` incorpora los modos Actual e Histórico.
+Para el histórico se utiliza un único corte al cierre del día en `America/Guatemala`,
+calculando las existencias físicas de las ubicaciones internas de los almacenes
+de la compañía activa. Se parte de `stock.quant` actual y se revierten los
+`stock.move` validados con `date >= inicio del día siguiente` (en UTC),
+convirtiendo cantidades a la UdM del producto, siguiendo la semántica nativa
+de `product.qty_available(to_date=...)` en Odoo 18.
+
+Las tarjetas históricas soportadas son Inventario por producto, Inventario por
+ubicación y Negativos. Las reservas no pueden reconstruirse fiablemente con
+los datos actuales y no se muestran en modo histórico. El modo actual conserva
+las tarjetas originales. El selector Almacén funciona en ambos modos.
+
+Limitaciones: las cantidades dependen de la integridad de los quants actuales
+y los movimientos validados posteriores al corte; cargas de stock fuera del
+motor de inventario, operaciones retroactivas y datos históricos ausentes
+pueden alterar el resultado. No se modifica ninguna operación de stock.

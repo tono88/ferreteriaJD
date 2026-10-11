@@ -22,6 +22,9 @@ class VlfDashboardClientAction extends Component {
                 date_to: "",
                 company_id: "",
                 custom: {},
+                inventory_mode: "current",
+                inventory_date: this.todayLocalDate(),
+                inventory_warehouse_id: "",
             },
             selectedDashboardId: params.dashboard_id || false,
             loading: false,
@@ -45,6 +48,12 @@ class VlfDashboardClientAction extends Component {
         onWillUnmount(() => {
             this.clearTimer();
         });
+    }
+
+    todayLocalDate() {
+        const current = new Date();
+        const pad = (number) => String(number).padStart(2, "0");
+        return `${current.getFullYear()}-${pad(current.getMonth() + 1)}-${pad(current.getDate())}`;
     }
 
     async loadBuilderCatalog() {
@@ -219,6 +228,10 @@ class VlfDashboardClientAction extends Component {
         await this.loadDashboard(parseInt(ev.target.value));
     }
 
+    onInventoryModeChange(ev) { this.state.filters.inventory_mode = ev.target.value || "current"; }
+    onInventoryDateChange(ev) { this.state.filters.inventory_date = ev.target.value || ""; }
+    onInventoryWarehouseChange(ev) { this.state.filters.inventory_warehouse_id = ev.target.value || ""; }
+
     onDateFromChange(ev) { this.state.filters.date_from = ev.target.value || ""; }
     onDateToChange(ev) { this.state.filters.date_to = ev.target.value || ""; }
     onCompanyChange(ev) { this.state.filters.company_id = ev.target.value || ""; }
@@ -244,6 +257,9 @@ class VlfDashboardClientAction extends Component {
         this.state.filters.date_to = "";
         this.state.filters.company_id = "";
         this.state.filters.custom = {};
+        this.state.filters.inventory_mode = "current";
+        this.state.filters.inventory_date = this.todayLocalDate();
+        this.state.filters.inventory_warehouse_id = "";
         await this.loadDashboard(this.state.selectedDashboardId);
     }
 

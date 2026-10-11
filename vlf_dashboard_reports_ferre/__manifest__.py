@@ -13,7 +13,7 @@ Incluye:
 - métricas oficiales y presets administrados;
 - endurecimiento del motor genérico de fechas, acumulados, totales y stock interno.
     ''',
-    'version': '18.0.1.1.0',
+    'version': '18.0.1.1.3',
     'category': 'Productivity/Reporting',
     'author': 'Ferretería / Tecnodyne extension',
     'license': 'LGPL-3',

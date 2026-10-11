@@ -29,12 +29,19 @@ class VlfDashboardMetricService:
             selected_year = int(raw_year) if raw_year else False
         except (TypeError, ValueError):
             selected_year = False
-        if selected_year:
+        # An explicit DESDE/HASTA interval takes precedence over the year.
+        # The year remains the default when neither date is selected.
+        explicit_from = (filters or {}).get('date_from') or False
+        explicit_to = (filters or {}).get('date_to') or False
+        if explicit_from or explicit_to:
+            date_from = explicit_from
+            date_to = explicit_to
+        elif selected_year:
             date_from = f'{selected_year:04d}-01-01'
             date_to = f'{selected_year:04d}-12-31'
         else:
-            date_from = (filters or {}).get('date_from') or False
-            date_to = (filters or {}).get('date_to') or False
+            date_from = False
+            date_to = False
         try:
             parsed_from = datetime.strptime(str(date_from), '%Y-%m-%d') if date_from else False
             parsed_to = datetime.strptime(str(date_to), '%Y-%m-%d') + timedelta(days=1) if date_to else False

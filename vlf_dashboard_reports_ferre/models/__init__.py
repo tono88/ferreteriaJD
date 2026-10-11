@@ -4,3 +4,4 @@ from . import preset_registry
 from . import sales_fact
 from . import dashboard
 from . import dashboard_item
+from . import inventory_history

@@ -328,3 +328,20 @@
     font-size: 12px;
     font-weight: 700;
 }
+
+/* Historical inventory (read-only snapshot); scoped to this dashboard. */
+.vlf-dashboard-app .vlf-inventory-history-note {
+    margin: 10px 12px; padding: 12px 16px; border: 1px solid #c7dfd1;
+    background: #f4fcf7; border-radius: 9px; display: flex; flex-direction: column;
+    gap: 6px; font-size: 13px; color: #274c39;
+}
+.vlf-dashboard-app .vlf-inventory-provisional {
+    color: #905908; font-weight: 600;
+}
+.vlf-dashboard-app .vlf-inventory-warehouse-summary {
+    display: flex; flex-wrap: wrap; gap: 8px; margin-top: 4px;
+}
+.vlf-dashboard-app .vlf-inventory-wh {
+    padding: 5px 9px; background: #fff; border: 1px solid #d8e8df;
+    border-radius: 6px; white-space: nowrap;
+}

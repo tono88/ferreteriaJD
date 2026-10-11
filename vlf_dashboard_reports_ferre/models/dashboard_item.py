@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 from odoo import api, fields, models, _
+from odoo.exceptions import UserError
 
 from .metric_service import VlfDashboardMetricService
 
@@ -62,6 +63,25 @@ class VlfDashboardItem(models.Model):
     def _eval_domain(self, filters=None):
         self.ensure_one()
         filters = dict(filters or {})
+        # Managed dashboards mix official metrics with standard ORM items.
+        # Official metrics compute their own year range in metric_service;
+        # standard items need the same semantics here. An explicit DESDE or
+        # HASTA always wins over the year selection.
+        if (
+            self.dashboard_id.managed_by_reports
+            and not self.metric_key
+            and self.data_source == 'odoo'
+            and self.date_field_id
+            and not (filters.get('date_from') or filters.get('date_to'))
+        ):
+            raw_year = (filters.get('custom') or {}).get('year')
+            try:
+                year = int(raw_year) if raw_year else 0
+            except (ValueError, TypeError):
+                year = 0
+            if 1900 <= year <= 2100:
+                filters['date_from'] = f'{year:04d}-01-01'
+                filters['date_to'] = f'{year:04d}-12-31'
         # La instalación usa una sola compañía. Nunca se confía en un company_id
         # recibido desde el navegador.
         filters['company_id'] = self.env.company.id
@@ -73,6 +93,20 @@ class VlfDashboardItem(models.Model):
                 domain.append(('company_id', '=', self.env.company.id))
             if self.model_id.model == 'stock.quant':
                 domain.append(('location_id.usage', '=', 'internal'))
+                if self.dashboard_id.name == 'Inventario':
+                    chosen = (filters or {}).get('inventory_warehouse_id')
+                    if chosen not in (None, False, ''):
+                        try:
+                            chosen_id = int(chosen)
+                        except (ValueError, TypeError):
+                            raise UserError(_('Almacén seleccionado no válido.'))
+                        warehouse = self.env['stock.warehouse'].with_context(active_test=False).search([
+                            ('id', '=', chosen_id),
+                            ('company_id', '=', self.env.company.id),
+                        ], limit=1)
+                        if not warehouse:
+                            raise UserError(_('El almacén no está disponible para la compañía actual.'))
+                        domain.append(('location_id', 'child_of', warehouse.view_location_id.id))
 
         # Para campos Datetime, los límites se convierten desde la zona horaria
         # del usuario hacia UTC y la fecha final se trata como inclusiva.

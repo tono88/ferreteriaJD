@@ -27,18 +27,40 @@
             </div>
 
             <div class="vlf-filter-panel" t-if="state.dashboard.enable_advanced_filters">
-                <div class="vlf-filter-group">
+                <div class="vlf-filter-group" t-if="state.dashboard.inventory_history_enabled">
+                    <label>Vista de inventario</label>
+                    <select class="vlf-select" t-att-value="state.filters.inventory_mode || 'current'" t-on-change="onInventoryModeChange">
+                        <option value="current" t-att-selected="state.filters.inventory_mode !== 'history'">Inventario actual</option>
+                        <option value="history" t-att-selected="state.filters.inventory_mode === 'history'">Inventario histórico</option>
+                    </select>
+                </div>
+                <div class="vlf-filter-group" t-if="state.dashboard.inventory_history_enabled and state.filters.inventory_mode === 'history'">
+                    <label>Existencias al cierre del día</label>
+                    <input type="date" t-att-value="state.filters.inventory_date" t-on-change="onInventoryDateChange"/>
+                    <small>Hora de Guatemala; el día en curso es provisional.</small>
+                </div>
+                <div class="vlf-filter-group" t-if="state.dashboard.inventory_history_enabled">
+                    <label>Sucursal / Almacén</label>
+                    <select class="vlf-select" t-on-change="onInventoryWarehouseChange">
+                        <option value="" t-att-selected="!state.filters.inventory_warehouse_id">Todas las sucursales</option>
+                        <t t-foreach="state.dashboard.inventory_warehouses || []" t-as="wh" t-key="wh.id">
+                            <option t-att-value="wh.id" t-att-selected="wh.id == state.filters.inventory_warehouse_id"><t t-esc="wh.name"/></option>
+                        </t>
+                    </select>
+                </div>
+                <div class="vlf-filter-group" t-if="!state.dashboard.inventory_history_enabled">
                     <label>Desde</label>
                     <input type="date" t-att-value="state.filters.date_from" t-on-change="onDateFromChange"/>
                 </div>
-                <div class="vlf-filter-group">
+                <div class="vlf-filter-group" t-if="!state.dashboard.inventory_history_enabled">
                     <label>Hasta</label>
                     <input type="date" t-att-value="state.filters.date_to" t-on-change="onDateToChange"/>
                 </div>
-                <div class="vlf-filter-group">
+                <div class="vlf-filter-group" t-if="!state.dashboard.inventory_history_enabled">
                     <label>Compañía</label>
                     <input type="number" t-att-value="state.filters.company_id" t-on-change="onCompanyChange" placeholder="ID compañía"/>
                 </div>
+                <t t-if="!state.dashboard.inventory_history_enabled or state.filters.inventory_mode !== 'history'">
                 <t t-foreach="state.dashboard.custom_filters || []" t-as="cfilter" t-key="cfilter.key">
                     <div class="vlf-filter-group vlf-custom-filter">
                         <label><t t-esc="cfilter.name"/></label>
@@ -65,7 +87,8 @@
                         <small t-if="cfilter.help_text"><t t-esc="cfilter.help_text"/></small>
                     </div>
                 </t>
-                <div class="vlf-filter-suggestions" t-if="state.dashboard.allow_instant_edit and (state.dashboard.suggested_filters || []).length">
+                </t>
+                <div class="vlf-filter-suggestions" t-if="state.dashboard.allow_instant_edit and (state.dashboard.suggested_filters || []).length and (!state.dashboard.inventory_history_enabled or state.filters.inventory_mode !== 'history')">
                     <div class="vlf-suggested-head">
                         <button type="button" class="btn btn-link" t-on-click="toggleFilterSuggestions">
                             <i class="fa fa-lightbulb-o"/> Filtros sugeridos
@@ -186,6 +209,17 @@ sale:Venta confirmada
 done:Bloqueado
 cancel:Cancelado</code>
                     </div>
+                </div>
+            </div>
+
+            <div class="vlf-inventory-history-note" t-if="state.dashboard.inventory_history_info">
+                <strong><i class="fa fa-calendar-check-o"/> Existencias al cierre del <t t-esc="state.dashboard.inventory_history_info.date"/></strong>
+                <span t-if="state.dashboard.inventory_history_info.provisional" class="vlf-inventory-provisional">Cierre provisional: todavía pueden registrarse movimientos durante este día.</span>
+                <small>Solo ubicaciones internas físicas; tránsito y reservas históricas no se incluyen. Los totales agregados mezclan unidades de medida: consulta las tarjetas por producto para una lectura precisa.</small>
+                <div class="vlf-inventory-warehouse-summary">
+                    <t t-foreach="state.dashboard.inventory_history_info.warehouses || []" t-as="wh" t-key="wh.id">
+                        <span class="vlf-inventory-wh"><strong><t t-esc="wh.name"/></strong>: <t t-esc="wh.product_count"/> productos con saldo | <t t-esc="formatNumber(wh.quantity, { precision_digits: 2, number_system: 'default' })"/> (cantidades agregadas)</span>
+                    </t>
                 </div>
             </div>
 
