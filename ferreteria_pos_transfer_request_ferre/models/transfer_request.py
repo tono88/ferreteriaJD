@@ -630,42 +630,44 @@ class FerreteriaTransferRequest(models.Model):
 
     def _action_approve(self, approve_all=False):
         for request in self:
-            request._lock_for_update()
-            request._ensure_approver_access()
-            if request.state not in ("submitted", "review"):
-                raise UserError(_("La solicitud ya fue procesada o no está pendiente de aprobación."))
-            if approve_all:
-                for line in request.line_ids:
-                    line.with_context(**transfer_flow_context()).write(
-                        {"approved_qty": line.requested_qty}
-                    )
-            request._validate_request_lines()
-            request._validate_approval_quantities()
-            request._create_and_reserve_pickings()
-            fully_approved = all(
-                float_compare(
-                    line.approved_qty,
-                    line.requested_qty,
-                    precision_rounding=line.product_uom_id.rounding,
-                ) == 0
-                for line in request.line_ids
-            )
-            request.with_context(**transfer_flow_context()).write(
-                {
-                    "state": "approved" if fully_approved else "partial",
-                    "approved_by_id": self.env.user.id,
-                    "approval_date": fields.Datetime.now(),
-                    "reviewing_user_id": request.reviewing_user_id.id or self.env.user.id,
-                    "review_date": request.review_date or fields.Datetime.now(),
-                }
-            )
-            request.message_post(
-                body=_(
-                    "Solicitud aprobada. Se reservaron %(qty)s unidades en el picking %(picking)s.",
-                    qty=request.approved_qty_total,
-                    picking=request.dispatch_picking_id.display_name,
+            # Todo el intento se revierte si falla cualquiera de sus etapas.
+            with self.env.cr.savepoint():
+                request._lock_for_update()
+                request._ensure_approver_access()
+                if request.state not in ("submitted", "review"):
+                    raise UserError(_("La solicitud ya fue procesada o no está pendiente de aprobación."))
+                if approve_all:
+                    for line in request.line_ids:
+                        line.with_context(**transfer_flow_context()).write(
+                            {"approved_qty": line.requested_qty}
+                        )
+                request._validate_request_lines()
+                request._validate_approval_quantities()
+                request._create_and_reserve_pickings()
+                fully_approved = all(
+                    float_compare(
+                        line.approved_qty,
+                        line.requested_qty,
+                        precision_rounding=line.product_uom_id.rounding,
+                    ) == 0
+                    for line in request.line_ids
                 )
-            )
+                request.with_context(**transfer_flow_context()).write(
+                    {
+                        "state": "approved" if fully_approved else "partial",
+                        "approved_by_id": self.env.user.id,
+                        "approval_date": fields.Datetime.now(),
+                        "reviewing_user_id": request.reviewing_user_id.id or self.env.user.id,
+                        "review_date": request.review_date or fields.Datetime.now(),
+                    }
+                )
+                request.message_post(
+                    body=_(
+                        "Solicitud aprobada. Se reservaron %(qty)s unidades en el picking %(picking)s.",
+                        qty=request.approved_qty_total,
+                        picking=request.dispatch_picking_id.display_name,
+                    )
+                )
         return True
 
     def _validate_approval_quantities(self):
@@ -744,6 +746,14 @@ class FerreteriaTransferRequest(models.Model):
 
     def _create_and_reserve_pickings(self):
         self.ensure_one()
+        # Defensa en profundidad: nunca permitir que un método auxiliar invoque
+        # sudo basándose únicamente en un contexto técnico o en el ID recibido.
+        self._ensure_approver_access()
+        if self.state not in ("submitted", "review"):
+            raise UserError(_("Solo una solicitud pendiente puede generar transferencias."))
+        self._check_branch_configuration()
+        self._validate_request_lines()
+        self._validate_approval_quantities()
         if self.dispatch_picking_id or self.receipt_picking_id:
             raise UserError(_("La solicitud ya tiene movimientos de inventario vinculados."))
 
@@ -753,12 +763,18 @@ class FerreteriaTransferRequest(models.Model):
         dispatch_picking = protected_picking.create(
             self._prepare_picking_values("dispatch")
         )
-        receipt_picking = protected_picking.create(
+        # La sucursal destino puede ser ajena al scope operativo del aprobador.
+        # Solo este picking derivado de una solicitud autorizada se crea con sudo;
+        # el despacho se mantiene con los permisos normales del usuario.
+        receipt_picking = protected_picking.sudo().create(
             self._prepare_picking_values("receipt")
         )
 
         dispatch_moves = self.env["stock.move"]
-        receipt_moves = self.env["stock.move"]
+        # La elevación no se aplica a la solicitud, a sus líneas ni al despacho.
+        # Se limita a los movimientos de recepción que acabamos de generar.
+        ReceiptMove = Move.sudo().with_context(**transfer_flow_context())
+        receipt_moves = ReceiptMove.browse()
         for line in self.line_ids.filtered(lambda current: current.approved_qty > 0):
             dispatch_move = Move.create(
                 self._prepare_move_values(
@@ -782,7 +798,7 @@ class FerreteriaTransferRequest(models.Model):
                     "procure_method": "make_to_order",
                 }
             )
-            receipt_move = Move.create(receipt_values)
+            receipt_move = ReceiptMove.create(receipt_values)
             line.with_context(**transfer_flow_context()).write(
                 {
                     "dispatch_move_id": dispatch_move.id,
@@ -792,9 +808,16 @@ class FerreteriaTransferRequest(models.Model):
             dispatch_moves |= dispatch_move
             receipt_moves |= receipt_move
 
-        dispatch_moves._action_confirm(merge=False)
+        # La confirmación/reserva del despacho puede consultar o actualizar los
+        # movimientos encadenados de recepción (fuera del scope del aprobador).
+        # Sudo se aplica solo a los movimientos de esta solicitud, ya creados
+        # con cantidades y ubicaciones validadas; nunca a búsquedas generales.
+        technical_dispatch_moves = dispatch_moves.sudo().with_context(
+            **transfer_flow_context()
+        )
+        technical_dispatch_moves._action_confirm(merge=False)
         receipt_moves._action_confirm(merge=False)
-        dispatch_moves._action_assign()
+        technical_dispatch_moves._action_assign()
 
         insufficient = []
         for line in self.line_ids.filtered("dispatch_move_id"):
@@ -1135,6 +1158,7 @@ class FerreteriaTransferRequest(models.Model):
                 picking.with_context(**transfer_flow_context()).action_cancel()
             else:
                 result = picking.with_context(
+                    skip_backorder=True,
                     picking_ids_not_to_backorder=picking.ids,
                     **transfer_flow_context(),
                 ).button_validate()

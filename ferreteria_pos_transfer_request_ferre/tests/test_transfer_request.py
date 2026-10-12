@@ -1,5 +1,7 @@
 # -*- coding: utf-8 -*-
 
+from unittest.mock import patch
+
 from odoo import Command
 from odoo.exceptions import AccessError, UserError
 from odoo.tests import new_test_user, tagged
@@ -208,6 +210,12 @@ class TestFerreteriaTransferRequest(TransactionCase):
         request.with_user(self.receiver).action_receive()
 
         self.assertEqual(request.state, "incident")
+        self.assertEqual(request.receipt_picking_id.state, "done")
+        self.assertFalse(
+            self.env["stock.picking"].sudo().search(
+                [("backorder_id", "=", request.receipt_picking_id.id)]
+            )
+        )
         self.assertEqual(request.line_ids.dispatched_qty, 5.0)
         self.assertEqual(request.line_ids.received_qty, 3.0)
         self.assertEqual(len(request.incident_ids), 1)
@@ -225,6 +233,126 @@ class TestFerreteriaTransferRequest(TransactionCase):
         request.with_user(self.requester).action_submit()
         with self.assertRaises(AccessError):
             request.with_user(self.unauthorized_approver).action_approve_all()
+        self.assertEqual(request.state, "submitted")
+        self.assertFalse(self.env["stock.picking"].sudo().search([
+            ("ferreteria_transfer_request_id", "=", request.id),
+        ]))
+
+    def test_receipt_creation_is_sudo_only_after_real_user_authorization(self):
+        """Sudo solo en el picking remoto; despacho y validación no son sudo."""
+        request = self._create_request(qty=3.0)
+        request.with_user(self.requester).action_submit()
+        PickingClass = type(self.env["stock.picking"])
+        original_create = PickingClass.create
+        observed = {}
+
+        def audit_create(model, vals_list):
+            values = vals_list[0] if isinstance(vals_list, list) else vals_list
+            if values.get("ferreteria_transfer_request_id") == request.id:
+                observed[values["ferreteria_transfer_stage"]] = (
+                    model.env.su,
+                    model.env.uid,
+                )
+            return original_create(model, vals_list)
+
+        with patch.object(PickingClass, "create", audit_create):
+            request.with_user(self.approver).action_approve_all()
+
+        self.assertEqual(observed["dispatch"], (False, self.approver.id))
+        self.assertEqual(observed["receipt"][0], True)
+        self.assertEqual(request.approved_by_id, self.approver)
+        self.assertEqual(request.dispatch_picking_id.picking_type_id,
+                         self.supplying_warehouse.int_type_id)
+        self.assertEqual(request.receipt_picking_id.picking_type_id,
+                         self.requesting_warehouse.int_type_id)
+        self.assertEqual(request.dispatch_picking_id.location_dest_id,
+                         request.transit_location_id)
+        self.assertEqual(request.receipt_picking_id.location_id,
+                         request.transit_location_id)
+        self.assertEqual(request.line_ids.dispatch_move_id.product_uom_qty, 3.0)
+        self.assertEqual(request.line_ids.receipt_move_id.product_uom_qty, 3.0)
+        self.assertIn(request.line_ids.dispatch_move_id,
+                      request.line_ids.receipt_move_id.move_orig_ids)
+
+    def test_failed_receipt_rolls_back_dispatch_and_approval(self):
+        """Error después de crear despacho no deja pickings, moves ni estado."""
+        request = self._create_request(qty=3.0)
+        request.with_user(self.requester).action_submit()
+        RequestClass = type(self.env["ferreteria.transfer.request"])
+        original_prepare = RequestClass._prepare_picking_values
+
+        def fail_receipt(record, stage):
+            if stage == "receipt":
+                raise UserError("Fallo simulado del segundo picking")
+            return original_prepare(record, stage)
+
+        with patch.object(RequestClass, "_prepare_picking_values", fail_receipt):
+            with self.assertRaisesRegex(UserError, "Fallo simulado"):
+                request.with_user(self.approver).action_approve_all()
+
+        request.invalidate_recordset()
+        request.line_ids.invalidate_recordset()
+        self.assertEqual(request.state, "submitted")
+        self.assertFalse(request.dispatch_picking_id)
+        self.assertFalse(request.receipt_picking_id)
+        self.assertFalse(request.approved_by_id)
+        self.assertEqual(request.line_ids.approved_qty, 0.0)
+        self.assertFalse(self.env["stock.picking"].sudo().search([
+            ("ferreteria_transfer_request_id", "=", request.id),
+        ]))
+        self.assertFalse(self.env["stock.move"].sudo().search([
+            ("origin", "=", request.name),
+        ]))
+
+    def test_failure_after_reservation_rolls_back_reserved_quants(self):
+        """Si falla la reserva después de asignar stock, se revierte todo."""
+        request = self._create_request(qty=3.0)
+        request.with_user(self.requester).action_submit()
+        Quant = self.env["stock.quant"].sudo()
+        quant_domain = [
+            ("product_id", "=", self.product.id),
+            ("location_id", "=", self.supplying_warehouse.lot_stock_id.id),
+        ]
+        original_reserved = sum(Quant.search(quant_domain).mapped("reserved_quantity"))
+        MoveClass = type(self.env["stock.move"])
+        original_assign = MoveClass._action_assign
+
+        def fail_after_assignment(moves, *args, **kwargs):
+            result = original_assign(moves, *args, **kwargs)
+            if any(move.picking_id.ferreteria_transfer_stage == "dispatch"
+                   and move.picking_id.ferreteria_transfer_request_id.id == request.id
+                   for move in moves):
+                raise UserError("Fallo simulado después de la reserva")
+            return result
+
+        with patch.object(MoveClass, "_action_assign", fail_after_assignment):
+            with self.assertRaisesRegex(UserError, "Fallo simulado"):
+                request.with_user(self.approver).action_approve_all()
+
+        request.invalidate_recordset()
+        self.assertEqual(request.state, "submitted")
+        self.assertFalse(self.env["stock.picking"].sudo().search([
+            ("ferreteria_transfer_request_id", "=", request.id),
+        ]))
+        self.assertFalse(self.env["stock.move"].sudo().search([
+            ("origin", "=", request.name),
+        ]))
+        self.assertEqual(
+            sum(Quant.search(quant_domain).mapped("reserved_quantity")),
+            original_reserved,
+        )
+
+    def test_reject_pending_request_without_stock_documents(self):
+        request = self._create_request(qty=2.0)
+        request.with_user(self.requester).action_submit()
+        request.with_user(self.approver).write({
+            "rejection_reason": "No hay disponibilidad para la solicitud.",
+        })
+        request.with_user(self.approver).action_reject()
+        self.assertEqual(request.state, "rejected")
+        self.assertFalse(self.env["stock.picking"].sudo().search([
+            ("ferreteria_transfer_request_id", "=", request.id),
+        ]))
 
     def test_requesting_warehouse_domain_and_default(self):
         Request = self.env["ferreteria.transfer.request"].with_user(self.requester)

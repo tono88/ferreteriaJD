@@ -1,5 +1,25 @@
 # Changelog
 
+## 18.0.2.3.4
+
+- Evita el asistente de backorder de Odoo 18 al registrar una recepción corta
+  controlada por la solicitud intersucursal.
+- Conserva la cantidad realmente recibida, cancela el remanente y permite crear
+  la incidencia automática sin dejar pickings de backorder huérfanos.
+- Añade regresión explícita para estado final del picking y ausencia de backorder.
+
+## 18.0.2.3.3 — Creación técnica acotada y atomicidad de aprobación intersucursal
+
+- Mantiene la autenticación/autorización del aprobador real mediante `_ensure_approver_access` **antes** de cualquier elevación técnica; el método auxiliar también verifica estado, compañía/sucursales y cantidades.
+- Conserva creación del picking y movimiento de despacho con el usuario real; crea bajo sudo solamente el picking de recepción y sus movimientos, que pueden corresponder al almacén ajeno al scope.
+- Usa elevación solo sobre los movimientos ya generados por la solicitud durante confirmación y reserva, por las dependencias técnicas entre despacho y recepción; no eleva la solicitud, las líneas, usuarios, catálogos ni otras operaciones manuales.
+- Envuelve cada aprobación y sus cambios de cantidades, pickings, reservas y estado en `env.cr.savepoint()`. Una excepción revierte toda la aprobación sin dejar pickings ni reservas parciales.
+- Mantiene los dos pickings, su dependencia `move_orig_ids`, `make_to_order` de recepción, cantidades aprobadas y comportamiento de aprobación parcial.
+- Agrega pruebas de autoría de la aprobación, elevación limitada a recepción, reversión cuando falla el segundo picking y reversión después de reservar, rechazo sin movimientos y bloqueo del aprobador no autorizado.
+- No cambia reglas 318–322, `ferreteria_user_scope_ferre`, vistas, POS, permisos ni datos existentes.
+- UAT funcional pendiente exclusivamente en `COPIA_PRDO_CUIDADO`. **No promover a producción todavía.**
+
+
 ## 18.0.2.3.0 — Selectores múltiples y administración sin dominios
 
 - Corrige los selectores vacíos de sucursal y POS causados por el alcance de compañía aplicado antes de seleccionar una sucursal.

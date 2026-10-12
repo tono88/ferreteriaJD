@@ -1,6 +1,6 @@
 {
     "name": "Ferretería - Seguridad por POS y almacén",
-    "version": "18.0.1.1.0",
+    "version": "18.0.1.2.0",
     "summary": "Ámbito operativo reutilizable por usuario, POS y almacén",
     "category": "Administration/Access Rights",
     "author": "DISTRIBUIDORA Y FERRETERÍA JB",
