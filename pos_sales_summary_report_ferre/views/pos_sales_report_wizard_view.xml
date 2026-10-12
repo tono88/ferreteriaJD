@@ -13,10 +13,16 @@
             <field name="invoice_filter"/>
             <p class="text-muted">Contado = Efectivo / Credito = otros metodos de pago</p>
 		  <!-- 👇 nuevo -->
-		  <field name="pos_config_id"
-				 options="{'no_create': True}"
-				 placeholder="Todos"
-				 domain="[('company_id','in', allowed_company_ids)]"/>
+          <!-- Operational POS Many2one for scoped users only; original domain intact. -->
+          <field name="pos_config_id"
+                 groups="!ferreteria_user_scope_ferre.group_pos_global_order_read"
+                 options="{'no_create': True}"
+                 placeholder="Todos"
+                 domain="[('company_id','in', allowed_company_ids)]"/>
+          <!-- Reporting-only selector: does not grant access to pos.config. -->
+          <field name="global_pos_config_id"
+                 groups="ferreteria_user_scope_ferre.group_pos_global_order_read"
+                 placeholder="Todos"/>
 		      <!-- 👇 NUEVO: filtro por clientes -->
 		  <field name="partner_ids"
 				 widget="many2many_tags"

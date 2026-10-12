@@ -1,12 +1,12 @@
 {
     'name': 'POS Sales Summary Report (Date Range, Payment Split, Invoice Filter)',
-    'version': '18.0.1.4.0',
+    'version': '18.0.1.5.2',
     'summary': 'Reporte PDF de ventas POS por rango de fechas. Contado=Efectivo, Crédito=Otros métodos. Filtro por facturadas/NO facturadas.',
     'author': 'ChatGPT Assist',
     'website': '',
     'category': 'Point of Sale',
     'license': 'LGPL-3',
-    'depends': ['point_of_sale', 'account', 'report_xlsx_ferre'],
+    'depends': ['point_of_sale', 'account', 'report_xlsx_ferre', 'ferreteria_user_scope_ferre'],
     'data': [
         'security/ir.model.access.csv',
         'report/pos_sales_report.xml',

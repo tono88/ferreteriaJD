@@ -38,10 +38,11 @@ class ReportPosSalesSummary(models.AbstractModel):
         method_type = getattr(method, "type", None)
         return isinstance(method_type, str) and method_type.lower() == "cash"
 
-    def _split_payments(self, order):
+    def _split_payments(self, order, payments=None):
+        """Use regular payments unless a restricted report-only set is provided."""
         cash = 0.0
         other = 0.0
-        for payment in order.payment_ids:
+        for payment in (order.payment_ids if payments is None else payments):
             amount = payment.amount or 0.0
             if amount <= 0:
                 continue
@@ -50,6 +51,39 @@ class ReportPosSalesSummary(models.AbstractModel):
             else:
                 other += amount
         return cash, other
+
+    def _report_payment_map(self, orders):
+        """Report-only access to payments of orders readable by this user.
+
+        pos.order is NEVER sudoed. All IDs originate from _search_orders(),
+        which applies its normal ACLs, record rules, dates, POS and customer
+        filters. An explicit company check also limits the privileged read.
+        Regular users continue to use order.payment_ids without elevation.
+        """
+        global_reader = self.env.user.has_group(
+            "ferreteria_user_scope_ferre.group_pos_global_order_read"
+        )
+        if not global_reader:
+            return None
+
+        company_ids = self.env.companies.ids
+        readable_order_ids = orders.filtered(
+            lambda order: order.company_id.id in company_ids
+        ).ids
+        if not readable_order_ids:
+            return {}
+
+        # Only a restricted read of pos.payment; no sudo of pos.order or
+        # the complete report environment. The related method/journal are
+        # accessed solely to categorize payments in this report.
+        payments = self.env["pos.payment"].sudo().search([
+            ("pos_order_id", "in", readable_order_ids),
+            ("pos_order_id.company_id", "in", company_ids),
+        ])
+        by_order = {order_id: [] for order_id in readable_order_ids}
+        for payment in payments:
+            by_order[payment.pos_order_id.id].append(payment)
+        return by_order
 
     @staticmethod
     def _format_amount(amount, currency):
@@ -100,14 +134,14 @@ class ReportPosSalesSummary(models.AbstractModel):
             observation = ""
         return fallback_date, observation
 
-    def _line_from_order(self, order, currency):
+    def _line_from_order(self, order, currency, payments=None):
         move = order.account_move
         invoice = "-"
         if move:
             invoice = getattr(move, "firma_fel", False) or move.name or "-"
 
         document_date, observation = self._document_date_data(order)
-        cash, other = self._split_payments(order)
+        cash, other = self._split_payments(order, payments=payments)
         total = order.amount_total or 0.0
         return {
             "partner": order.partner_id.name or _("Consumidor Final"),
@@ -138,6 +172,11 @@ class ReportPosSalesSummary(models.AbstractModel):
         end_utc = data.get("end_utc")
         invoice_filter = data.get("invoice_filter", "all")
         pos_config_id = self._normalize_pos_config_id(data)
+        # Validate the input again server-side: a forged report action must
+        # never bypass the report-only company/POS selector.
+        self.env["pos.sales.report.wizard"]._assert_report_pos_filter_allowed(
+            pos_config_id
+        )
         partner_ids = data.get("partner_ids") or []
         if isinstance(partner_ids, int):
             partner_ids = [partner_ids]
@@ -194,12 +233,20 @@ class ReportPosSalesSummary(models.AbstractModel):
     @api.model
     def _get_report_values(self, docids, data=None):
         data = data or {}
-        orders = self._search_orders(data)
+        orders = self._search_orders(data)  # Ordinary user access; no sudo.
+        payments_by_order = self._report_payment_map(orders)
         currency = self.env.company.currency_id
         lines = []
         invoice_references = []
         for order in orders:
-            line = self._line_from_order(order, currency)
+            # A missing entry means no payment; never fall back to scoped
+            # order.payment_ids for global readers, which may hide payments.
+            payments = (
+                payments_by_order.get(order.id, [])
+                if payments_by_order is not None
+                else None
+            )
+            line = self._line_from_order(order, currency, payments=payments)
             if line["contado"] == 0 and line["credito"] == 0:
                 continue
             lines.append(line)

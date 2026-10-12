@@ -1,6 +1,7 @@
 
 # -*- coding: utf-8 -*-
 from odoo import api, fields, models, _
+from odoo.exceptions import AccessError
 from datetime import datetime, time
 import pytz
 
@@ -17,6 +18,108 @@ class PosSalesReportWizard(models.TransientModel):
         string="Punto de venta",
         help="Si no seleccionas nada, se incluyen todos los puntos de venta."
     )
+    # A reporting-only selector. Do NOT expose pos.config through normal
+    # record rules: operational POS access must remain scoped.
+    global_pos_config_id = fields.Selection(
+        selection="_selection_global_pos_configs",
+        string="Punto de venta",
+        help="Si no seleccionas nada, se incluyen todos los puntos de venta.",
+    )
+    can_select_global_pos = fields.Boolean(
+        compute="_compute_can_select_global_pos",
+    )
+
+    @api.depends_context("uid")
+    def _compute_can_select_global_pos(self):
+        is_global_reader = self.env.user.has_group(
+            "ferreteria_user_scope_ferre.group_pos_global_order_read"
+        )
+        for wizard in self:
+            wizard.can_select_global_pos = is_global_reader
+
+    @api.model
+    def _global_pos_catalog(self):
+        """Only names/IDs of active POS in *currently allowed* companies.
+
+        This technical read grants no POS operation, session or write access.
+        It is deliberately not callable as a cross-company catalog by normal
+        scoped users. Validations on both wizard and report use this method.
+        """
+        if not self.env.user.has_group(
+            "ferreteria_user_scope_ferre.group_pos_global_order_read"
+        ):
+            return {}
+        company_ids = self.env.companies.ids
+        if not company_ids:
+            return {}
+        records = self.env["pos.config"].sudo().search_read(
+            [("company_id", "in", company_ids), ("active", "=", True)],
+            fields=["id", "name"],
+            order="name, id",
+        )
+        return {record["id"]: record["name"] for record in records}
+
+    @api.model
+    def _selection_global_pos_configs(self):
+        return [
+            (str(pos_id), name)
+            for pos_id, name in self._global_pos_catalog().items()
+        ]
+
+    @api.model
+    def _assert_report_pos_filter_allowed(self, pos_id):
+        """Validate client-supplied POS IDs, including direct report RPCs."""
+        if not pos_id:
+            return
+        try:
+            pos_id = int(pos_id)
+            if pos_id <= 0:
+                raise ValueError("POS ID must be positive")
+        except (TypeError, ValueError):
+            raise AccessError(_("El punto de venta seleccionado no es válido."))
+
+        if self.env.user.has_group(
+            "ferreteria_user_scope_ferre.group_pos_global_order_read"
+        ):
+            if pos_id not in self._global_pos_catalog():
+                raise AccessError(
+                    _("No tiene autorización para filtrar por ese punto de venta.")
+                )
+        else:
+            # No sudo: normal users retain their original pos.config rules.
+            allowed = self.env["pos.config"].search(
+                [
+                    ("id", "=", pos_id),
+                    ("company_id", "in", self.env.companies.ids),
+                ],
+                limit=1,
+            )
+            if not allowed:
+                raise AccessError(
+                    _("No tiene autorización para filtrar por ese punto de venta.")
+                )
+
+    def _selected_report_pos(self):
+        """Return the existing report contract: (pos_config_id, name)."""
+        self.ensure_one()
+        if self.env.user.has_group(
+            "ferreteria_user_scope_ferre.group_pos_global_order_read"
+        ):
+            if not self.global_pos_config_id:
+                return False, "Todos"
+            pos_id = int(self.global_pos_config_id)
+            catalog = self._global_pos_catalog()
+            if pos_id not in catalog:
+                raise AccessError(
+                    _("No tiene autorización para filtrar por ese punto de venta.")
+                )
+            return pos_id, catalog[pos_id]
+
+        if not self.pos_config_id:
+            return False, "Todos"
+        self._assert_report_pos_filter_allowed(self.pos_config_id.id)
+        return self.pos_config_id.id, self.pos_config_id.display_name
+
     partner_ids = fields.Many2many(
         "res.partner",
         string="Clientes",
@@ -66,6 +169,7 @@ class PosSalesReportWizard(models.TransientModel):
     def action_print_pdf(self):
         self.ensure_one()
         start_utc, end_utc = self._get_utc_bounds()
+        pos_id, pos_name = self._selected_report_pos()
         data = {
             "date_from": str(self.date_from),
             "date_to": str(self.date_to),
@@ -73,8 +177,8 @@ class PosSalesReportWizard(models.TransientModel):
             "start_utc": start_utc,
             "end_utc": end_utc,
             # 👇 nuevo
-            "pos_config_id": self.pos_config_id.id if self.pos_config_id else False,
-            "pos_config_name": self.pos_config_id.display_name if self.pos_config_id else "Todos",
+            "pos_config_id": pos_id,
+            "pos_config_name": pos_name,
             # 👇 NUEVO: filtro por clientes
             "partner_ids": self.partner_ids.ids,
             "partner_names": ", ".join(self.partner_ids.mapped("display_name")) if self.partner_ids else "Todos",
@@ -108,14 +212,15 @@ class PosSalesReportWizard(models.TransientModel):
     def action_print_xlsx(self):
         self.ensure_one()
         start_utc, end_utc = self._get_utc_bounds()
+        pos_id, pos_name = self._selected_report_pos()
         data = {
             "date_from": str(self.date_from),
             "date_to": str(self.date_to),
             "invoice_filter": self.invoice_filter,
             "start_utc": start_utc,
             "end_utc": end_utc,
-            "pos_config_id": self.pos_config_id.id if self.pos_config_id else False,
-            "pos_config_name": self.pos_config_id.display_name if self.pos_config_id else "Todos",
+            "pos_config_id": pos_id,
+            "pos_config_name": pos_name,
             # 👇 NUEVO: filtro por clientes
             "partner_ids": self.partner_ids.ids,
             "partner_names": ", ".join(self.partner_ids.mapped("display_name")) if self.partner_ids else "Todos",
