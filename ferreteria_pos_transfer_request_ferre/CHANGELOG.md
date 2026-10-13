@@ -1,5 +1,15 @@
 # Changelog
 
+## 18.0.2.3.5 — Lectura técnica del POS solicitante tras autorización
+
+- Corrige el `AccessError` en la aprobación intersucursal cuando el aprobador del almacén suministrador no tiene lectura de `pos.config` del almacén solicitante (caso reportado: `STS/2026/00038`, Mayoreo → Taxisco, Ingrid de Paz).
+- `_create_and_reserve_pickings()` sigue comprobando los permisos de aprobación del usuario real antes de crear cualquier operación; la comprobación del POS solicitante utiliza elevación solo para resolver su almacén asociado.
+- Conserva las validaciones de compañía y almacenes, con acceso ordinario en `@api.constrains`, creación y edición. No eleva la solicitud ni sus líneas, y no abre lectura general de POS.
+- Añade regresiones simulando el POS solicitante no legible para el aprobador: aprobación total/parcial, tercero no autorizado y comprobación de que la validación ordinaria no se eleva.
+- Preserva íntegramente `skip_backorder=True` y el resto de 18.0.2.3.4. No se modifican usuarios, reglas de scopes, permisos ni configuración POS.
+- Pruebas funcionales en `COPIA_PRDO_CUIDADO`: pendientes, sin promoción a producción.
+
+
 ## 18.0.2.3.4
 
 - Evita el asistente de backorder de Odoo 18 al registrar una recepción corta

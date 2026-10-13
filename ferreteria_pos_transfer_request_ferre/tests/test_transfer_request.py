@@ -3,7 +3,7 @@
 from unittest.mock import patch
 
 from odoo import Command
-from odoo.exceptions import AccessError, UserError
+from odoo.exceptions import AccessError, UserError, ValidationError
 from odoo.tests import new_test_user, tagged
 from odoo.tests.common import TransactionCase
 
@@ -233,6 +233,113 @@ class TestFerreteriaTransferRequest(TransactionCase):
         request.with_user(self.requester).action_submit()
         with self.assertRaises(AccessError):
             request.with_user(self.unauthorized_approver).action_approve_all()
+        self.assertEqual(request.state, "submitted")
+        self.assertFalse(self.env["stock.picking"].sudo().search([
+            ("ferreteria_transfer_request_id", "=", request.id),
+        ]))
+
+    def _simulate_requesting_pos_outside_approver_scope(self, observed):
+        """Simulate the POS record rule from STS/2026/00038, independently
+        of the host's installed ferreteria_user_scope_ferre version.
+
+        Every lookup of the requesting POS is recorded.  The supplier's
+        approver receives AccessError for the ordinary POS field read.
+        """
+        PosClass = type(self.env["pos.config"])
+        original_lookup = PosClass._ferreteria_transfer_warehouse
+        pos_id = self.pos_config.id
+        approver_id = self.approver.id
+
+        def protected_lookup(pos):
+            if pos.id == pos_id:
+                observed.append((pos.env.uid, pos.env.su))
+                if pos.env.uid == approver_id and not pos.env.su:
+                    raise AccessError("No tiene acceso 'leer' a POS Mayoreo simulado")
+            return original_lookup(pos)
+
+        return patch.object(PosClass, "_ferreteria_transfer_warehouse", protected_lookup)
+
+    def test_sts_2026_00038_approve_all_with_requesting_pos_unreadable(self):
+        """Mayoreo -> Taxisco: permitted supplier approves, POS remains blocked."""
+        request = self._create_request(qty=4.0)
+        request.with_user(self.requester).action_submit()
+        reads = []
+        with self._simulate_requesting_pos_outside_approver_scope(reads):
+            # A direct lookup remains forbidden outside the approved workflow.
+            with self.assertRaises(AccessError):
+                self.pos_config.with_user(self.approver)._ferreteria_transfer_warehouse()
+            reads.clear()
+            request.with_user(self.approver).action_approve_all()
+
+        self.assertEqual(request.state, "approved")
+        self.assertEqual(request.approved_by_id, self.approver)
+        self.assertTrue(reads)
+        self.assertTrue(all(uid == self.approver.id and su for uid, su in reads))
+        self.assertEqual(request.dispatch_picking_id.picking_type_id,
+                         self.supplying_warehouse.int_type_id)
+        self.assertEqual(request.receipt_picking_id.picking_type_id,
+                         self.requesting_warehouse.int_type_id)
+        self.assertEqual(request.dispatch_picking_id.location_dest_id,
+                         request.transit_location_id)
+        self.assertEqual(request.receipt_picking_id.location_id,
+                         request.transit_location_id)
+        self.assertEqual(request.line_ids.dispatch_move_id.product_uom_qty, 4.0)
+        self.assertEqual(request.line_ids.receipt_move_id.product_uom_qty, 4.0)
+
+    def test_sts_2026_00038_partial_with_requesting_pos_unreadable(self):
+        request = self._create_request(qty=8.0)
+        request.with_user(self.requester).action_submit()
+        request.line_ids.with_user(self.approver).approved_qty = 5.0
+        reads = []
+        with self._simulate_requesting_pos_outside_approver_scope(reads):
+            request.with_user(self.approver).action_approve_partial()
+
+        self.assertEqual(request.state, "partial")
+        self.assertEqual(request.line_ids.approved_qty, 5.0)
+        self.assertEqual(request.line_ids.dispatch_move_id.product_uom_qty, 5.0)
+        self.assertEqual(request.line_ids.receipt_move_id.product_uom_qty, 5.0)
+        self.assertTrue(reads)
+        self.assertTrue(all(uid == self.approver.id and su for uid, su in reads))
+
+    def test_sts_2026_00038_unauthorized_user_never_gets_pos_sudo(self):
+        request = self._create_request(qty=2.0)
+        request.with_user(self.requester).action_submit()
+        reads = []
+        with self._simulate_requesting_pos_outside_approver_scope(reads):
+            with self.assertRaises(AccessError):
+                request.with_user(self.unauthorized_approver).action_approve_all()
+        self.assertEqual(reads, [])
+        self.assertEqual(request.state, "submitted")
+        self.assertFalse(self.env["stock.picking"].sudo().search([
+            ("ferreteria_transfer_request_id", "=", request.id),
+        ]))
+
+    def test_sts_2026_00038_constraint_remains_without_sudo(self):
+        """Create/edit constraint must not silently bypass requesting POS rules."""
+        request = self._create_request(qty=2.0)
+        request.with_user(self.requester).action_submit()
+        reads = []
+        with self._simulate_requesting_pos_outside_approver_scope(reads):
+            with self.assertRaises(AccessError):
+                request.with_user(self.approver)._check_branch_configuration()
+        self.assertEqual(reads, [(self.approver.id, False)])
+
+    def test_sts_2026_00038_technical_pos_read_still_validates_warehouse(self):
+        """Sudo is only for reading; inconsistent warehouse must be rejected."""
+        request = self._create_request(qty=2.0)
+        request.with_user(self.requester).action_submit()
+        PosClass = type(self.env["pos.config"])
+        original_lookup = PosClass._ferreteria_transfer_warehouse
+
+        def wrong_warehouse(pos):
+            if pos.id == self.pos_config.id and pos.env.su:
+                return self.other_warehouse
+            return original_lookup(pos)
+
+        with patch.object(PosClass, "_ferreteria_transfer_warehouse", wrong_warehouse):
+            with self.assertRaises(ValidationError):
+                request.with_user(self.approver).action_approve_all()
+        request.invalidate_recordset()
         self.assertEqual(request.state, "submitted")
         self.assertFalse(self.env["stock.picking"].sudo().search([
             ("ferreteria_transfer_request_id", "=", request.id),

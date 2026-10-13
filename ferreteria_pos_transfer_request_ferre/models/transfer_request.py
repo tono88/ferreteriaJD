@@ -445,7 +445,14 @@ class FerreteriaTransferRequest(models.Model):
         "requesting_pos_id",
         "company_id",
     )
-    def _check_branch_configuration(self):
+    def _check_branch_configuration(self, technical_pos_read=False):
+        """Validate branches; restrict technical POS reads to approved workflow.
+
+        The ORM constraint and all normal create/edit paths use the real user's
+        POS access rules (the default).  Only an already-authorized supplying-
+        warehouse approver can resolve the remote requesting POS during approval.
+        No elevated request, user, or picking recordset is returned.
+        """
         for request in self:
             if request.requesting_warehouse_id == request.supplying_warehouse_id:
                 raise ValidationError(
@@ -455,10 +462,16 @@ class FerreteriaTransferRequest(models.Model):
             if any(warehouse.company_id != request.company_id for warehouse in warehouses):
                 raise ValidationError(_("Los almacenes deben pertenecer a la compañía de la solicitud."))
             if request.requesting_pos_id:
-                pos_warehouse = (
-                    request.requesting_pos_id._ferreteria_transfer_warehouse()
-                )
-                if pos_warehouse != request.requesting_warehouse_id:
+                pos_config = request.requesting_pos_id
+                if technical_pos_read:
+                    # Defense in depth: never allow a remote POS read before
+                    # authorizing the *real* user for the supplying warehouse.
+                    request._ensure_approver_access()
+                    # Elevation is scoped to this single configured POS and its
+                    # linked operation type/warehouse, not to the request flow.
+                    pos_config = pos_config.sudo()
+                pos_warehouse = pos_config._ferreteria_transfer_warehouse()
+                if pos_warehouse.id != request.requesting_warehouse_id.id:
                     raise ValidationError(
                         _("El punto de venta solicitante no pertenece al almacén seleccionado.")
                     )
@@ -751,11 +764,15 @@ class FerreteriaTransferRequest(models.Model):
         self._ensure_approver_access()
         if self.state not in ("submitted", "review"):
             raise UserError(_("Solo una solicitud pendiente puede generar transferencias."))
-        self._check_branch_configuration()
         self._validate_request_lines()
         self._validate_approval_quantities()
         if self.dispatch_picking_id or self.receipt_picking_id:
             raise UserError(_("La solicitud ya tiene movimientos de inventario vinculados."))
+        # Only after all ordinary user/state/line/quantity/duplicate checks do
+        # we resolve the remote requesting POS to verify its warehouse.  The
+        # remaining warehouse/company checks still use the real user.
+        # Example: Ingrid (Taxisco) approving a request from POS Mayoreo.
+        self._check_branch_configuration(technical_pos_read=True)
 
         Picking = self.env["stock.picking"]
         Move = self.env["stock.move"]
