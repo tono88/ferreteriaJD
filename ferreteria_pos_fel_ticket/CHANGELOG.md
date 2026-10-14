@@ -1,5 +1,12 @@
 # Changelog
 
+## 18.0.2.0.5 — 2026-10-13
+
+- Muestra `CRÉDITO` cuando existe un pago positivo con `is_customer_account=True`.
+- Mantiene `CRÉDITO` para pagos mixtos con una parte cargada a cuenta del cliente.
+- Muestra `PAGADO` solo cuando métodos normales cubren el total.
+- Sustituye `PENDIENTE DE PAGO` por `NO PAGADO` cuando no hay crédito ni cobertura completa.
+
 ## 18.0.2.0.1 — 2026-09-30
 
 - Sustituye en el recibo térmico POS las líneas básicas de Odoo por líneas compactas propias del ticket.

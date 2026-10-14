@@ -302,11 +302,18 @@ class PosOrder(models.Model):
             return _("ANULADO")
         if not is_fel and self.state == "cancel":
             return _("ANULADA")
+        has_customer_credit = any(
+            (payment.amount or 0.0) > 0
+            and getattr(payment.payment_method_id, "is_customer_account", False)
+            for payment in self.payment_ids
+        )
+        if has_customer_credit:
+            return _("CRÉDITO")
         currency = self.currency_id
         fully_paid = currency.compare_amounts(
             self.amount_paid or 0.0, self.amount_total or 0.0
         ) >= 0
-        return _("PAGADO") if fully_paid else _("PENDIENTE DE PAGO")
+        return _("PAGADO") if fully_paid else _("NO PAGADO")
 
     @staticmethod
     def _split_internal_correlative(value):
