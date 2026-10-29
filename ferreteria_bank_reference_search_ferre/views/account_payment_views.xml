@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<odoo>
+    <record id="view_payment_list_bank_reference" model="ir.ui.view">
+        <field name="name">account.payment.list.bank.reference.ferre</field>
+        <field name="model">account.payment</field>
+        <field name="inherit_id" ref="account.view_account_payment_tree"/>
+        <field name="arch" type="xml">
+            <xpath expr="//list/field[@name='name']" position="after">
+                <field name="bank_reference" string="No. boleta bancaria" optional="show"/>
+            </xpath>
+        </field>
+    </record>
+    <record id="view_payment_search_bank_reference" model="ir.ui.view">
+        <field name="name">account.payment.search.bank.reference.ferre</field>
+        <field name="model">account.payment</field>
+        <field name="inherit_id" ref="account.view_account_payment_search"/>
+        <field name="arch" type="xml">
+            <xpath expr="//search/field[@name='name']" position="after">
+                <field name="bank_reference" string="No. boleta bancaria"
+                       filter_domain="[('bank_reference', 'ilike', self)]"/>
+            </xpath>
+        </field>
+    </record>
+</odoo>
