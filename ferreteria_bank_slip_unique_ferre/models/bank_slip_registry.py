@@ -33,6 +33,12 @@ class FerreteriaBankSlipRegistry(models.Model):
     source_model = fields.Char(string="Modelo origen", required=True, readonly=True, index=True)
     source_res_id = fields.Integer(string="ID origen", required=True, readonly=True, index=True)
     source_display_name = fields.Char(string="Pago origen", required=True, readonly=True)
+    payment_ids = fields.Many2many(
+        "account.payment",
+        "ferre_bank_slip_account_payment_rel",
+        "registry_id", "payment_id",
+        string="Pagos de la operación", readonly=True, copy=False,
+    )
     registered_by_id = fields.Many2one(
         "res.users",
         string="Registrado por",
@@ -123,6 +129,13 @@ class FerreteriaBankSlipRegistry(models.Model):
         if same_claim:
             return cleaned
 
+        if source._name == "account.payment" and self.sudo().search_count([
+            ("company_id", "=", company.id),
+            ("number_normalized", "=", normalized),
+            ("payment_ids", "in", source.ids),
+        ]):
+            return cleaned
+
         values = {
             "company_id": company.id,
             "number_original": cleaned,
@@ -138,3 +151,26 @@ class FerreteriaBankSlipRegistry(models.Model):
         except IntegrityError:
             raise ValidationError(self._duplicate_message(normalized, company)) from None
         return cleaned
+
+    @api.model
+    def _claim_payment_batch(self, payments):
+        """Reserve each number for payments created by ONE register operation.
+
+        Private: accepting arbitrary existing payments here via RPC would let
+        users attach unrelated payments to an already reserved bank slip.
+        The wizard calls this inside its savepoint after all inherited writes.
+        """
+        groups = {}
+        for payment in payments:
+            normalized = self.normalize_number(payment.bank_reference)
+            if normalized:
+                key = (payment.company_id.id, normalized)
+                groups.setdefault(key, self.env["account.payment"])
+                groups[key] |= payment
+        for (company_id, normalized), batch in groups.items():
+            self.claim(batch[0], batch[0].bank_reference)
+            claim = self.sudo().search([
+                ("company_id", "=", company_id),
+                ("number_normalized", "=", normalized),
+            ], limit=1)
+            claim.write({"payment_ids": [(4, payment.id) for payment in batch]})

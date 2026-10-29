@@ -1,6 +1,10 @@
 # -*- coding: utf-8 -*-
 from odoo import api, models
 
+# An identity-only marker cannot be supplied through a JSON/RPC context.
+# Only the register wizard may defer claims until all its payments exist.
+_REGISTER_BATCH = object()
+
 
 class AccountPayment(models.Model):
     _inherit = "account.payment"
@@ -12,8 +16,9 @@ class AccountPayment(models.Model):
             if "bank_reference" in vals:
                 vals["bank_reference"] = registry.clean_number(vals.get("bank_reference"))
         payments = super().create(vals_list)
-        for payment in payments:
-            registry.claim(payment, payment.bank_reference)
+        if self.env.context.get("_bank_slip_register_batch") is not _REGISTER_BATCH:
+            for payment in payments:
+                registry.claim(payment, payment.bank_reference)
         return payments
 
     def write(self, vals):
@@ -21,7 +26,8 @@ class AccountPayment(models.Model):
         if "bank_reference" in vals:
             vals["bank_reference"] = registry.clean_number(vals.get("bank_reference"))
         result = super().write(vals)
-        if "bank_reference" in vals:
+        if ("bank_reference" in vals
+                and self.env.context.get("_bank_slip_register_batch") is not _REGISTER_BATCH):
             for payment in self:
                 registry.claim(payment, payment.bank_reference)
         return result
