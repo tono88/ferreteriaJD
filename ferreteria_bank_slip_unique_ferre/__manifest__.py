@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 {
     "name": "Ferretería - Boleta bancaria única",
-    "version": "18.0.1.1.0",
+    "version": "18.0.1.2.0",
     "summary": "Impide reutilizar números de boleta bancaria entre pagos de la compañía.",
     "category": "Accounting/Payments",
     "author": "Custom",

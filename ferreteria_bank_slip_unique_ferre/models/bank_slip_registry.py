@@ -4,7 +4,7 @@ import unicodedata
 from psycopg2 import IntegrityError
 
 from odoo import api, fields, models, _
-from odoo.exceptions import ValidationError
+from odoo.exceptions import AccessError, ValidationError
 
 
 class FerreteriaBankSlipRegistry(models.Model):
@@ -39,6 +39,7 @@ class FerreteriaBankSlipRegistry(models.Model):
         "registry_id", "payment_id",
         string="Pagos de la operación", readonly=True, copy=False,
     )
+    recovery_history = fields.Json(string="Historial de recuperaciones", readonly=True, copy=False)
     registered_by_id = fields.Many2one(
         "res.users",
         string="Registrado por",
@@ -75,6 +76,14 @@ class FerreteriaBankSlipRegistry(models.Model):
             limit=1,
         )
         if duplicate:
+            if duplicate.source_model == "account.payment":
+                original = self.env["account.payment"].sudo().browse(duplicate.source_res_id).exists()
+                if not original or original.state == "canceled":
+                    return _(
+                        "La boleta %(number)s conserva una reserva histórica del pago ID %(id)s "
+                        "(cancelado o eliminado). Un administrador contable puede revisarla "
+                        "con 'Recuperar boleta anulada' y registrar el motivo."
+                    ) % {"number": duplicate.number_original, "id": duplicate.source_res_id}
             return _(
                 "La boleta bancaria %(number)s ya fue utilizada en %(payment)s. "
                 "No es posible registrarla nuevamente."
@@ -117,6 +126,13 @@ class FerreteriaBankSlipRegistry(models.Model):
             return cleaned
 
         company = getattr(source, "company_id", False) or self.env.company
+        # Normal posting/editing must serialize with administrative recovery as
+        # well, so an old payment cannot reactivate while its claim is replaced.
+        self.env.cr.execute(
+            "SELECT id FROM ferreteria_bank_slip_registry "
+            "WHERE company_id = %s AND number_normalized = %s FOR UPDATE",
+            [company.id, normalized],
+        )
         same_claim = self.sudo().search(
             [
                 ("company_id", "=", company.id),
@@ -153,7 +169,7 @@ class FerreteriaBankSlipRegistry(models.Model):
         return cleaned
 
     @api.model
-    def _claim_payment_batch(self, payments):
+    def _claim_payment_batch(self, payments, recovery_reason=None):
         """Reserve each number for payments created by ONE register operation.
 
         Private: accepting arbitrary existing payments here via RPC would let
@@ -168,9 +184,68 @@ class FerreteriaBankSlipRegistry(models.Model):
                 groups.setdefault(key, self.env["account.payment"])
                 groups[key] |= payment
         for (company_id, normalized), batch in groups.items():
+            existing = self.sudo().search([
+                ("company_id", "=", company_id),
+                ("number_normalized", "=", normalized),
+            ], limit=1)
+            if recovery_reason and existing:
+                self._recover_cancelled_claim(existing, batch, recovery_reason)
+                continue
             self.claim(batch[0], batch[0].bank_reference)
             claim = self.sudo().search([
                 ("company_id", "=", company_id),
                 ("number_normalized", "=", normalized),
             ], limit=1)
             claim.write({"payment_ids": [(4, payment.id) for payment in batch]})
+
+    @api.model
+    def _recover_cancelled_claim(self, claim, payments, reason):
+        """Explicit accounting-manager correction, never an automatic release."""
+        if not (self.env.user.has_group("account.group_account_manager")
+                or self.env.user.has_group("base.group_system")):
+            raise AccessError(_("Solo un administrador contable puede recuperar una boleta."))
+        if not reason or not reason.strip():
+            raise ValidationError(_("Indique el motivo de recuperación de la boleta."))
+        # Serialize recoveries of the same reservation. The unique SQL constraint
+        # is kept intact; a reservation is never deleted or temporarily released.
+        self.env.cr.execute(
+            "SELECT id FROM ferreteria_bank_slip_registry WHERE id = %s FOR UPDATE",
+            [claim.id],
+        )
+        claim.invalidate_recordset()
+        if claim.source_model != "account.payment":
+            raise ValidationError(_("No se puede recuperar una boleta reservada por pagos POS."))
+        Payment = self.env["account.payment"].sudo().with_context(active_test=False)
+        previous = claim.payment_ids | Payment.browse(claim.source_res_id).exists()
+        previous.invalidate_recordset()
+        if any(payment.state != "canceled" for payment in previous):
+            raise ValidationError(_("La boleta todavía tiene pagos sin cancelar; no se puede recuperar."))
+        # Also detect manually edited/unlinked associations, with identical Unicode
+        # normalization to the reservation itself (not only an exact SQL match).
+        others = Payment.search([
+            ("company_id", "=", claim.company_id.id),
+            ("bank_reference", "!=", False),
+            ("state", "!=", "canceled"),
+            ("id", "not in", payments.ids),
+        ])
+        if any(self.normalize_number(p.bank_reference) == claim.number_normalized for p in others):
+            raise ValidationError(_("La boleta todavía está en uso por otro pago activo."))
+        snapshot = {
+            "source_model": claim.source_model,
+            "source_res_id": claim.source_res_id,
+            "source_display_name": claim.source_display_name,
+            "payment_ids": previous.ids,
+            "registered_by_id": claim.registered_by_id.id,
+            "registered_on": fields.Datetime.to_string(claim.create_date),
+            "recovered_by_id": self.env.uid,
+            "recovered_on": fields.Datetime.to_string(fields.Datetime.now()),
+            "reason": reason.strip(),
+            "replacement_payment_ids": payments.ids,
+        }
+        claim.write({
+            "recovery_history": (claim.recovery_history or []) + [snapshot],
+            "source_model": "account.payment",
+            "source_res_id": payments[0].id,
+            "source_display_name": self._source_label(payments[0]),
+            "payment_ids": [(6, 0, payments.ids)],
+        })
