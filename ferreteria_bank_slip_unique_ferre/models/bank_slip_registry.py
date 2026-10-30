@@ -4,7 +4,7 @@ import unicodedata
 from psycopg2 import IntegrityError
 
 from odoo import api, fields, models, _
-from odoo.exceptions import AccessError, ValidationError
+from odoo.exceptions import ValidationError
 
 
 class FerreteriaBankSlipRegistry(models.Model):
@@ -76,14 +76,6 @@ class FerreteriaBankSlipRegistry(models.Model):
             limit=1,
         )
         if duplicate:
-            if duplicate.source_model == "account.payment":
-                original = self.env["account.payment"].sudo().browse(duplicate.source_res_id).exists()
-                if not original or original.state == "canceled":
-                    return _(
-                        "La boleta %(number)s conserva una reserva histórica del pago ID %(id)s "
-                        "(cancelado o eliminado). Un administrador contable puede revisarla "
-                        "con 'Recuperar boleta anulada' y registrar el motivo."
-                    ) % {"number": duplicate.number_original, "id": duplicate.source_res_id}
             return _(
                 "La boleta bancaria %(number)s ya fue utilizada en %(payment)s. "
                 "No es posible registrarla nuevamente."
@@ -114,15 +106,13 @@ class FerreteriaBankSlipRegistry(models.Model):
 
     @api.model
     def claim(self, source, number):
-        """Reserve a bank-slip number permanently for a source payment.
-
-        Historical claims are intentionally retained if a payment is later
-        cancelled, deleted or edited, implementing the strict no-reuse policy.
-        """
+        """Reserve a number for an active payment; cancelled payments do not count."""
         source.ensure_one()
         cleaned = self.clean_number(number)
         normalized = self.normalize_number(cleaned)
         if not normalized:
+            return cleaned
+        if source._name == "account.payment" and source.state == "canceled":
             return cleaned
 
         company = getattr(source, "company_id", False) or self.env.company
@@ -152,6 +142,14 @@ class FerreteriaBankSlipRegistry(models.Model):
         ]):
             return cleaned
 
+        existing = self.sudo().search([
+            ("company_id", "=", company.id),
+            ("number_normalized", "=", normalized),
+        ], limit=1)
+        if source._name == "account.payment" and self._is_cancelled_claim(existing):
+            self._recover_cancelled_claim(existing, source)
+            return cleaned
+
         values = {
             "company_id": company.id,
             "number_original": cleaned,
@@ -169,7 +167,7 @@ class FerreteriaBankSlipRegistry(models.Model):
         return cleaned
 
     @api.model
-    def _claim_payment_batch(self, payments, recovery_reason=None):
+    def _claim_payment_batch(self, payments):
         """Reserve each number for payments created by ONE register operation.
 
         Private: accepting arbitrary existing payments here via RPC would let
@@ -188,8 +186,8 @@ class FerreteriaBankSlipRegistry(models.Model):
                 ("company_id", "=", company_id),
                 ("number_normalized", "=", normalized),
             ], limit=1)
-            if recovery_reason and existing:
-                self._recover_cancelled_claim(existing, batch, recovery_reason)
+            if self._is_cancelled_claim(existing):
+                self._recover_cancelled_claim(existing, batch)
                 continue
             self.claim(batch[0], batch[0].bank_reference)
             claim = self.sudo().search([
@@ -199,13 +197,20 @@ class FerreteriaBankSlipRegistry(models.Model):
             claim.write({"payment_ids": [(4, payment.id) for payment in batch]})
 
     @api.model
-    def _recover_cancelled_claim(self, claim, payments, reason):
-        """Explicit accounting-manager correction, never an automatic release."""
-        if not (self.env.user.has_group("account.group_account_manager")
-                or self.env.user.has_group("base.group_system")):
-            raise AccessError(_("Solo un administrador contable puede recuperar una boleta."))
-        if not reason or not reason.strip():
-            raise ValidationError(_("Indique el motivo de recuperación de la boleta."))
+    def _is_cancelled_claim(self, claim):
+        if not claim or claim.source_model != "account.payment":
+            return False
+        Payment = self.env["account.payment"].sudo().with_context(active_test=False)
+        previous = claim.payment_ids | Payment.browse(claim.source_res_id).exists()
+        return all(payment.state == "canceled" for payment in previous)
+
+    @api.model
+    def _recover_cancelled_claim(self, claim, payments):
+        """Automatically replace a cancelled/deleted accounting operation.
+
+        Private and called only by the normal claim path, under the same row
+        lock. Keep the old reservation in the audit trail without extra UI.
+        """
         # Serialize recoveries of the same reservation. The unique SQL constraint
         # is kept intact; a reservation is never deleted or temporarily released.
         self.env.cr.execute(
@@ -239,7 +244,7 @@ class FerreteriaBankSlipRegistry(models.Model):
             "registered_on": fields.Datetime.to_string(claim.create_date),
             "recovered_by_id": self.env.uid,
             "recovered_on": fields.Datetime.to_string(fields.Datetime.now()),
-            "reason": reason.strip(),
+            "reason": "Reutilización automática: los pagos anteriores están cancelados o eliminados.",
             "replacement_payment_ids": payments.ids,
         }
         claim.write({

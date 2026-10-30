@@ -6,7 +6,7 @@ Impide reutilizar un número de boleta bancaria dentro de la misma compañía en
 - `pos.order.payment.bank_slip_number`;
 - `pos.order.payment.master.bank_slip_number`.
 
-La comparación elimina espacios externos, normaliza Unicode y no distingue mayúsculas/minúsculas. Los registros históricos no se liberan al cancelar, eliminar o editar un pago.
+La comparación elimina espacios externos, normaliza Unicode y no distingue mayúsculas/minúsculas. Los registros históricos se conservan; las operaciones contables canceladas o eliminadas permiten reutilizar el número automáticamente.
 
 ## Mejora 18.0.1.1.0: una boleta por operación de registro
 
@@ -42,31 +42,22 @@ conservación del historial y rechazo de contextos RPC que intenten saltarse la
 validación. Ejecutar en una base de pruebas con las dependencias instaladas:
 `odoo-bin -c /ruta/odoo.conf -d BD_PRUEBAS -u ferreteria_bank_slip_unique_ferre --test-enable --test-tags /ferreteria_bank_slip_unique_ferre --stop-after-init`
 
-## Recuperación de boletas anuladas — 18.0.1.2.0
+## Reutilización automática — 18.0.1.3.0
 
-Cancelar o eliminar un pago no elimina su reserva histórica. Por ello una boleta
-puede bloquearse aunque no aparezca al buscar pagos. Antes no existía un mecanismo
-para corregir una operación anulada: el error seguía mostrando el nombre del
-pago original, incluso cuando este había sido eliminado.
+Los pagos contables cancelados ya no bloquean su número de boleta. Al registrar
+un pago nuevo, si todos los pagos de la reserva anterior están cancelados o ya
+no existen, la reserva se reasigna automáticamente y conserva la auditoría.
+No hay casillas, motivos obligatorios ni permisos adicionales de recuperación.
+Si cualquier pago anterior continúa activo, la boleta permanece bloqueada.
+Esto también funciona para reservas antiguas, sin cancelar y volver a cancelar.
+Las reservas POS mantienen su validación existente.
 
-Un administrador contable o de sistema puede ahora registrar la operación
-corregida desde el asistente de pagos:
-
-1. Seleccionar las facturas pendientes y abrir **Pagar**.
-2. Indicar diario, método, fecha y número real de boleta.
-3. Marcar **Recuperar boleta anulada** y explicar el motivo.
-4. Confirmar los pagos.
-
-La recuperación solo procede si todos los pagos asociados anteriores están
-cancelados o ya no existen y ningún otro pago activo usa la misma referencia.
-No permite recuperar reservas POS. La reserva se bloquea durante la operación,
-conserva su identificador y guarda un historial con origen anterior, usuario,
-fecha, motivo y pagos sustitutos. La operación completa se revierte si falla.
-Los pagos cancelados sustituidos no pueden volver a publicarse con esa boleta.
-Sin marcar la recuperación, la política histórica continúa igual.
-
+Los pagos cancelados sustituidos no se pueden reactivar si el número ya está
+ocupado por otro pago activo. Se conserva la compatibilidad con el verificador
+antiguo de duplicados para publicar y conciliar correctamente los pagos.
+La actualización elimina los campos del procedimiento manual introducido en
+18.0.1.2.0, conservando el historial de recuperaciones existente.
 Actualizar el módulo y reiniciar todos los procesos Odoo como se describe arriba.
-Esta versión agrega un campo JSON de auditoría; no borra reservas existentes.
 
 ## Instalación
 

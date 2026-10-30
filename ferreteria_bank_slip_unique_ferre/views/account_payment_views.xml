@@ -21,13 +21,6 @@
                 <attribute name="string">No. boleta bancaria</attribute>
                 <attribute name="placeholder">Número único por compañía</attribute>
             </field>
-            <field name="bank_reference" position="after">
-                <field name="recover_bank_slip" groups="account.group_account_manager,base.group_system"/>
-                <field name="bank_slip_recovery_reason"
-                       groups="account.group_account_manager,base.group_system"
-                       invisible="not recover_bank_slip" required="recover_bank_slip"
-                       placeholder="Por qué se corrige la operación cancelada o eliminada"/>
-            </field>
         </field>
     </record>
 </odoo>

@@ -1,14 +1,11 @@
 # -*- coding: utf-8 -*-
 from odoo import fields, models, _
-from odoo.exceptions import AccessError, ValidationError
+from odoo.exceptions import ValidationError
 from .account_payment import _REGISTER_BATCH
 
 
 class AccountPaymentRegister(models.TransientModel):
     _inherit = "account.payment.register"
-
-    recover_bank_slip = fields.Boolean(string="Recuperar boleta anulada")
-    bank_slip_recovery_reason = fields.Char(string="Motivo de recuperación")
 
     def action_create_payments(self):
         # The legacy checker also intercepts the public button, and considers
@@ -19,14 +16,6 @@ class AccountPaymentRegister(models.TransientModel):
 
     def _create_payments(self):
         self.ensure_one()
-        reason = None
-        if self.recover_bank_slip:
-            if not (self.env.user.has_group("account.group_account_manager")
-                    or self.env.user.has_group("base.group_system")):
-                raise AccessError(_("Solo un administrador contable puede recuperar una boleta."))
-            reason = (self.bank_slip_recovery_reason or "").strip()
-            if not reason or not self.bank_reference:
-                raise ValidationError(_("Indique la boleta y el motivo de recuperación."))
         # The accounting kit writes bank_reference after super creates/posts
         # the payments. Defer through the entire chain, not just create().
         wizard = self.with_context(_bank_slip_register_batch=_REGISTER_BATCH)
@@ -40,7 +29,7 @@ class AccountPaymentRegister(models.TransientModel):
             # Remove the marker from the returned recordset so future edits
             # always enforce uniqueness normally.
             payments = payments.with_env(self.env)
-            self.env["ferreteria.bank.slip.registry"]._claim_payment_batch(payments, reason)
+            self.env["ferreteria.bank.slip.registry"]._claim_payment_batch(payments)
         return payments
 
 

@@ -1,5 +1,5 @@
 from odoo import Command
-from odoo.exceptions import AccessError, ValidationError
+from odoo.exceptions import ValidationError
 from odoo.tests import tagged
 from odoo.addons.account.tests.common import AccountTestInvoicingCommon
 
@@ -79,16 +79,12 @@ class TestPaymentBatchBankSlip(AccountTestInvoicingCommon):
 
     def _recover(self, invoices, number):
         wizard = self._wizard(invoices, number)
-        wizard.write({"recover_bank_slip": True, "bank_slip_recovery_reason": "Corregir operación anulada"})
         return wizard._create_payments()
 
     def test_recover_cancelled_operation_and_block_old_reactivation(self):
         invoices = self._invoice(self.partner_a) | self._invoice(self.partner_b)
         old = self._wizard(invoices, "CANCEL-123")._create_payments()
         old.action_cancel()
-        # Ordinary registration still preserves the strict historical policy.
-        with self.assertRaises(ValidationError):
-            self._wizard(invoices, "CANCEL-123")._create_payments()
         new = self._recover(invoices, "CANCEL-123")
         claim = self.env["ferreteria.bank.slip.registry"].sudo().search([
             ("number_normalized", "=", "cancel-123"),
@@ -123,21 +119,17 @@ class TestPaymentBatchBankSlip(AccountTestInvoicingCommon):
         self.assertEqual(self.env["account.payment"].search_count([]), count)
         self.assertEqual(other.amount_residual, other.amount_total)
 
-    def test_recovery_requires_reason_and_accounting_manager(self):
-        invoice = self._invoice(self.partner_a)
-        wizard = self._wizard(invoice, "PERM-123")
-        wizard.recover_bank_slip = True
+    def test_partial_cancellation_still_blocks_and_no_extra_fields(self):
+        self.assertNotIn("recover_bank_slip", self.env["account.payment.register"]._fields)
+        invoices = self._invoice(self.partner_a) | self._invoice(self.partner_b)
+        old = self._wizard(invoices, "PARTIAL-CANCEL")._create_payments()
+        old[:1].action_cancel()
         with self.assertRaises(ValidationError):
-            wizard._create_payments()
-        wizard.bank_slip_recovery_reason = "Corregir anulación"
-        user = self.env["res.users"].create({
-            "name": "Bank slip billing user", "login": "bank_slip_billing_test",
-            "company_id": self.env.company.id,
-            "company_ids": [Command.set(self.env.companies.ids)],
-            "groups_id": [Command.set([self.env.ref("account.group_account_invoice").id])],
-        })
-        with self.assertRaises(AccessError):
-            wizard.with_user(user)._create_payments()
+            self._wizard(self._invoice(self.partner_a), "PARTIAL-CANCEL")._create_payments()
+        old[1:].action_cancel()
+        new = self._wizard(invoices, "PARTIAL-CANCEL")._create_payments()
+        self.assertTrue(new)
+        self.assertTrue(all(inv.amount_residual == 0 for inv in invoices))
 
     def test_seven_invoices_grouped_and_legacy_duplicate_checker(self):
         invoices = self.env["account.move"]
@@ -157,7 +149,6 @@ class TestPaymentBatchBankSlip(AccountTestInvoicingCommon):
         old = self._wizard(invoices, "PUBLIC-123")._create_payments()
         old.action_cancel()
         wizard = self._wizard(invoices, "PUBLIC-123")
-        wizard.write({"recover_bank_slip": True, "bank_slip_recovery_reason": "Corregir operación anulada"})
         result = wizard.action_create_payments()
         self.assertNotEqual(result.get("res_model"), "account.dup.bank.reference.wizard")
         payments = self.env["account.payment"].search([("bank_reference", "=", "PUBLIC-123"), ("state", "!=", "canceled")])

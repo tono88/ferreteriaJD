@@ -1,5 +1,12 @@
 # Changelog
 
+## 18.0.1.3.0 — 2026-10-29
+
+- Los pagos cancelados o eliminados dejan de bloquear su boleta automáticamente.
+- Elimina el procedimiento manual de recuperación y sus campos del asistente.
+- Conserva la auditoría y el bloqueo si queda cualquier pago activo.
+- Incluye pruebas de cancelación parcial, reutilización normal y botón público.
+
 ## 18.0.1.2.0 — 2026-10-29
 
 - Agrega recuperación explícita de reservas de pagos cancelados o eliminados.
